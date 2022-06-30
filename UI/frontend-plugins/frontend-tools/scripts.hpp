@@ -2,7 +2,6 @@
 
 #include <QWidget>
 #include <QString>
-#include <memory>
 
 class Ui_ScriptsTool;
 
@@ -28,7 +27,7 @@ public slots:
 class ScriptsTool : public QWidget {
 	Q_OBJECT
 
-	std::unique_ptr<Ui_ScriptsTool> ui;
+	Ui_ScriptsTool *ui;
 	QWidget *propertiesView = nullptr;
 
 public:

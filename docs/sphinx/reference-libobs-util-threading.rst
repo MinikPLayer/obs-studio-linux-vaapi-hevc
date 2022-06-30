@@ -3,7 +3,7 @@ Threading
 
 Libobs provides a number of helper functions/types specifically for
 threading.  The threading header will additionally provide access to
-pthread functions even on Windows.
+pthread functions even on windows.
 
 .. code:: cpp
 

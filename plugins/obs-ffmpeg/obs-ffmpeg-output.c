@@ -26,7 +26,6 @@
 #include "obs-ffmpeg-formats.h"
 #include "obs-ffmpeg-compat.h"
 #include <libavutil/channel_layout.h>
-#include <libavutil/mastering_display_metadata.h>
 
 struct ffmpeg_output {
 	obs_output_t *output;
@@ -49,7 +48,7 @@ struct ffmpeg_output {
 	os_sem_t *write_sem;
 	os_event_t *stop_event;
 
-	DARRAY(AVPacket *) packets;
+	DARRAY(AVPacket) packets;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -223,43 +222,6 @@ static bool create_video_stream(struct ffmpeg_data *data)
 			data->config.video_encoder))
 		return false;
 
-	const enum AVColorTransferCharacteristic trc = data->config.color_trc;
-	const bool pq = trc == AVCOL_TRC_SMPTE2084;
-	const bool hlg = trc == AVCOL_TRC_ARIB_STD_B67;
-	if (pq || hlg) {
-		const int hdr_nominal_peak_level =
-			pq ? (int)obs_get_video_hdr_nominal_peak_level()
-			   : (hlg ? 1000 : 0);
-
-		size_t content_size;
-		AVContentLightMetadata *const content =
-			av_content_light_metadata_alloc(&content_size);
-		content->MaxCLL = hdr_nominal_peak_level;
-		content->MaxFALL = hdr_nominal_peak_level;
-		av_stream_add_side_data(data->video,
-					AV_PKT_DATA_CONTENT_LIGHT_LEVEL,
-					(uint8_t *)content, content_size);
-
-		AVMasteringDisplayMetadata *const mastering =
-			av_mastering_display_metadata_alloc();
-		mastering->display_primaries[0][0] = av_make_q(17, 25);
-		mastering->display_primaries[0][1] = av_make_q(8, 25);
-		mastering->display_primaries[1][0] = av_make_q(53, 200);
-		mastering->display_primaries[1][1] = av_make_q(69, 100);
-		mastering->display_primaries[2][0] = av_make_q(3, 20);
-		mastering->display_primaries[2][1] = av_make_q(3, 50);
-		mastering->white_point[0] = av_make_q(3127, 10000);
-		mastering->white_point[1] = av_make_q(329, 1000);
-		mastering->min_luminance = av_make_q(0, 1);
-		mastering->max_luminance = av_make_q(hdr_nominal_peak_level, 1);
-		mastering->has_primaries = 1;
-		mastering->has_luminance = 1;
-		av_stream_add_side_data(data->video,
-					AV_PKT_DATA_MASTERING_DISPLAY_METADATA,
-					(uint8_t *)mastering,
-					sizeof(*mastering));
-	}
-
 	closest_format = data->config.format;
 	if (data->vcodec->pix_fmts) {
 		closest_format = avcodec_find_best_pix_fmt_of_list(
@@ -324,12 +286,9 @@ static bool open_audio_codec(struct ffmpeg_data *data, int idx)
 
 	data->aframe[idx]->format = context->sample_fmt;
 	data->aframe[idx]->channels = context->channels;
-#if LIBAVUTIL_VERSION_INT < AV_VERSION_INT(57, 24, 100)
 	data->aframe[idx]->channel_layout = context->channel_layout;
-#else
-	data->aframe[idx]->ch_layout = context->ch_layout;
-#endif
 	data->aframe[idx]->sample_rate = context->sample_rate;
+
 	context->strict_std_compliance = -2;
 
 	ret = avcodec_open2(context, data->acodec, NULL);
@@ -384,18 +343,13 @@ static bool create_audio_stream(struct ffmpeg_data *data, int idx)
 	context->time_base = (AVRational){1, aoi.samples_per_sec};
 	context->channels = get_audio_channels(aoi.speakers);
 	context->sample_rate = aoi.samples_per_sec;
-#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(59, 24, 100)
 	context->channel_layout =
 		av_get_default_channel_layout(context->channels);
 
 	//avutil default channel layout for 5 channels is 5.0 ; fix for 4.1
 	if (aoi.speakers == SPEAKERS_4POINT1)
 		context->channel_layout = av_get_channel_layout("4.1");
-#else
-	av_channel_layout_default(&context->ch_layout, context->channels);
-	if (aoi.speakers == SPEAKERS_4POINT1)
-		context->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_4POINT1;
-#endif
+
 	context->sample_fmt = data->acodec->sample_fmts
 				      ? data->acodec->sample_fmts[0]
 				      : AV_SAMPLE_FMT_FLTP;
@@ -503,7 +457,11 @@ static inline bool open_output_file(struct ffmpeg_data *data)
 
 static void close_video(struct ffmpeg_data *data)
 {
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 48, 101)
 	avcodec_free_context(&data->video_ctx);
+#else
+	avcodec_close(data->video->codec);
+#endif
 	av_frame_unref(data->vframe);
 
 	// This format for some reason derefs video frame
@@ -523,8 +481,13 @@ static void close_audio(struct ffmpeg_data *data)
 
 		if (data->samples[idx][0])
 			av_freep(&data->samples[idx][0]);
-		if (data->audio_infos[idx].ctx)
+		if (data->audio_infos[idx].ctx) {
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 48, 101)
 			avcodec_free_context(&data->audio_infos[idx].ctx);
+#else
+			avcodec_close(data->audio_infos[idx].stream->codec);
+#endif
+		}
 		if (data->aframe[idx])
 			av_frame_free(&data->aframe[idx]);
 	}
@@ -777,8 +740,10 @@ static void receive_video(void *param, struct video_data *frame)
 		return;
 
 	AVCodecContext *context = data->video_ctx;
-	AVPacket *packet = NULL;
+	AVPacket packet = {0};
 	int ret = 0, got_packet;
+
+	av_init_packet(&packet);
 
 	if (!output->video_start_ts)
 		output->video_start_ts = frame->timestamp;
@@ -801,19 +766,15 @@ static void receive_video(void *param, struct video_data *frame)
 	else
 		copy_data(data->vframe, frame, context->height,
 			  context->pix_fmt);
-
-	packet = av_packet_alloc();
-
 #if LIBAVFORMAT_VERSION_MAJOR < 58
 	if (data->output->flags & AVFMT_RAWPICTURE) {
-		packet->flags |= AV_PKT_FLAG_KEY;
-		packet->stream_index = data->video->index;
-		packet->data = data->vframe->data[0];
-		packet->size = sizeof(AVPicture);
+		packet.flags |= AV_PKT_FLAG_KEY;
+		packet.stream_index = data->video->index;
+		packet.data = data->vframe->data[0];
+		packet.size = sizeof(AVPicture);
 
 		pthread_mutex_lock(&output->write_mutex);
 		da_push_back(output->packets, &packet);
-		packet = NULL;
 		pthread_mutex_unlock(&output->write_mutex);
 		os_sem_post(output->write_sem);
 
@@ -823,14 +784,15 @@ static void receive_video(void *param, struct video_data *frame)
 #if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(57, 40, 101)
 		ret = avcodec_send_frame(context, data->vframe);
 		if (ret == 0)
-			ret = avcodec_receive_packet(context, packet);
+			ret = avcodec_receive_packet(context, &packet);
 
 		got_packet = (ret == 0);
 
 		if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN))
 			ret = 0;
 #else
-	ret = avcodec_encode_video2(context, packet, data->vframe, &got_packet);
+	ret = avcodec_encode_video2(context, &packet, data->vframe,
+				    &got_packet);
 #endif
 		if (ret < 0) {
 			blog(LOG_WARNING,
@@ -838,21 +800,20 @@ static void receive_video(void *param, struct video_data *frame)
 			     "video: %s",
 			     av_err2str(ret));
 			//FIXME: stop the encode with an error
-			goto fail;
+			return;
 		}
 
-		if (!ret && got_packet && packet->size) {
-			packet->pts = rescale_ts(packet->pts, context,
-						 data->video->time_base);
-			packet->dts = rescale_ts(packet->dts, context,
-						 data->video->time_base);
-			packet->duration = (int)av_rescale_q(
-				packet->duration, context->time_base,
+		if (!ret && got_packet && packet.size) {
+			packet.pts = rescale_ts(packet.pts, context,
+						data->video->time_base);
+			packet.dts = rescale_ts(packet.dts, context,
+						data->video->time_base);
+			packet.duration = (int)av_rescale_q(
+				packet.duration, context->time_base,
 				data->video->time_base);
 
 			pthread_mutex_lock(&output->write_mutex);
 			da_push_back(output->packets, &packet);
-			packet = NULL;
 			pthread_mutex_unlock(&output->write_mutex);
 			os_sem_post(output->write_sem);
 		} else {
@@ -868,9 +829,6 @@ static void receive_video(void *param, struct video_data *frame)
 	}
 
 	data->total_frames++;
-
-fail:
-	av_packet_free(&packet);
 }
 
 static void encode_audio(struct ffmpeg_output *output, int idx,
@@ -878,7 +836,7 @@ static void encode_audio(struct ffmpeg_output *output, int idx,
 {
 	struct ffmpeg_data *data = &output->ff_data;
 
-	AVPacket *packet = NULL;
+	AVPacket packet = {0};
 	int ret, got_packet;
 	size_t total_size = data->frame_size * block_size * context->channels;
 
@@ -902,48 +860,42 @@ static void encode_audio(struct ffmpeg_output *output, int idx,
 
 	data->total_samples[idx] += data->frame_size;
 
-	packet = av_packet_alloc();
-
 #if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(57, 40, 101)
 	ret = avcodec_send_frame(context, data->aframe[idx]);
 	if (ret == 0)
-		ret = avcodec_receive_packet(context, packet);
+		ret = avcodec_receive_packet(context, &packet);
 
 	got_packet = (ret == 0);
 
 	if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN))
 		ret = 0;
 #else
-	ret = avcodec_encode_audio2(context, packet, data->aframe[idx],
+	ret = avcodec_encode_audio2(context, &packet, data->aframe[idx],
 				    &got_packet);
 #endif
 	if (ret < 0) {
 		blog(LOG_WARNING, "encode_audio: Error encoding audio: %s",
 		     av_err2str(ret));
 		//FIXME: stop the encode with an error
-		goto fail;
+		return;
 	}
 
 	if (!got_packet)
-		goto fail;
+		return;
 
-	packet->pts = rescale_ts(packet->pts, context,
-				 data->audio_infos[idx].stream->time_base);
-	packet->dts = rescale_ts(packet->dts, context,
-				 data->audio_infos[idx].stream->time_base);
-	packet->duration =
-		(int)av_rescale_q(packet->duration, context->time_base,
+	packet.pts = rescale_ts(packet.pts, context,
+				data->audio_infos[idx].stream->time_base);
+	packet.dts = rescale_ts(packet.dts, context,
+				data->audio_infos[idx].stream->time_base);
+	packet.duration =
+		(int)av_rescale_q(packet.duration, context->time_base,
 				  data->audio_infos[idx].stream->time_base);
-	packet->stream_index = data->audio_infos[idx].stream->index;
+	packet.stream_index = data->audio_infos[idx].stream->index;
 
 	pthread_mutex_lock(&output->write_mutex);
 	da_push_back(output->packets, &packet);
 	pthread_mutex_unlock(&output->write_mutex);
 	os_sem_post(output->write_sem);
-
-	return;
-fail:
-	av_packet_free(&packet);
 }
 
 /* Given a bitmask for the selected tracks and the mix index,
@@ -1026,7 +978,7 @@ static uint64_t get_packet_sys_dts(struct ffmpeg_output *output,
 
 static int process_packet(struct ffmpeg_output *output)
 {
-	AVPacket *packet;
+	AVPacket packet;
 	bool new_packet = false;
 	int ret;
 
@@ -1047,16 +999,16 @@ static int process_packet(struct ffmpeg_output *output)
 			packet.stream_index, output->packets.num);*/
 
 	if (stopping(output)) {
-		uint64_t sys_ts = get_packet_sys_dts(output, packet);
+		uint64_t sys_ts = get_packet_sys_dts(output, &packet);
 		if (sys_ts >= output->stop_ts)
 			return 0;
 	}
 
-	output->total_bytes += packet->size;
+	output->total_bytes += packet.size;
 
-	ret = av_interleaved_write_frame(output->ff_data.output, packet);
+	ret = av_interleaved_write_frame(output->ff_data.output, &packet);
 	if (ret < 0) {
-		av_packet_free(&packet);
+		av_free_packet(&packet);
 		ffmpeg_log_error(LOG_WARNING, &output->ff_data,
 				 "process_packet: Error writing packet: %s",
 				 av_err2str(ret));
@@ -1156,35 +1108,28 @@ static bool try_connect(struct ffmpeg_output *output)
 
 	config.color_range = voi->range == VIDEO_RANGE_FULL ? AVCOL_RANGE_JPEG
 							    : AVCOL_RANGE_MPEG;
-	config.colorspace = format_is_yuv(voi->format) ? AVCOL_SPC_BT709
-						       : AVCOL_SPC_RGB;
 	switch (voi->colorspace) {
 	case VIDEO_CS_601:
 		config.color_primaries = AVCOL_PRI_SMPTE170M;
 		config.color_trc = AVCOL_TRC_SMPTE170M;
-		config.colorspace = AVCOL_SPC_SMPTE170M;
 		break;
 	case VIDEO_CS_DEFAULT:
 	case VIDEO_CS_709:
 		config.color_primaries = AVCOL_PRI_BT709;
 		config.color_trc = AVCOL_TRC_BT709;
-		config.colorspace = AVCOL_SPC_BT709;
 		break;
 	case VIDEO_CS_SRGB:
 		config.color_primaries = AVCOL_PRI_BT709;
 		config.color_trc = AVCOL_TRC_IEC61966_2_1;
-		config.colorspace = AVCOL_SPC_BT709;
 		break;
-	case VIDEO_CS_2100_PQ:
-		config.color_primaries = AVCOL_PRI_BT2020;
-		config.color_trc = AVCOL_TRC_SMPTE2084;
-		config.colorspace = AVCOL_SPC_BT2020_NCL;
-		break;
-	case VIDEO_CS_2100_HLG:
-		config.color_primaries = AVCOL_PRI_BT2020;
-		config.color_trc = AVCOL_TRC_ARIB_STD_B67;
-		config.colorspace = AVCOL_SPC_BT2020_NCL;
-		break;
+	}
+
+	if (format_is_yuv(voi->format)) {
+		config.colorspace = (voi->colorspace == VIDEO_CS_601)
+					    ? AVCOL_SPC_SMPTE170M
+					    : AVCOL_SPC_BT709;
+	} else {
+		config.colorspace = AVCOL_SPC_RGB;
 	}
 
 	if (config.format == AV_PIX_FMT_NONE) {
@@ -1298,7 +1243,7 @@ static void ffmpeg_deactivate(struct ffmpeg_output *output)
 	pthread_mutex_lock(&output->write_mutex);
 
 	for (size_t i = 0; i < output->packets.num; i++)
-		av_packet_free(output->packets.array + i);
+		av_free_packet(output->packets.array + i);
 	da_free(output->packets);
 
 	pthread_mutex_unlock(&output->write_mutex);

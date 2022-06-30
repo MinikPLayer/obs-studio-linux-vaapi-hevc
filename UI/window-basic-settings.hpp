@@ -28,7 +28,6 @@
 
 #include <obs.hpp>
 
-#include "streaming-helpers.hpp"
 #include "auth-base.hpp"
 
 class OBSBasic;
@@ -41,8 +40,6 @@ class OBSPropertiesView;
 class OBSHotkeyWidget;
 
 #include "ui_OBSBasicSettings.h"
-
-#include <json11.hpp>
 
 #define VOLUME_METER_DECAY_FAST 23.53
 #define VOLUME_METER_DECAY_MEDIUM 11.76
@@ -162,8 +159,6 @@ private:
 	uint32_t outputCX = 0;
 	uint32_t outputCY = 0;
 
-	StreamSettingsUI streamUi;
-
 	QPointer<QCheckBox> simpleVodTrack;
 
 	QPointer<QCheckBox> vodTrackCheckbox;
@@ -227,11 +222,8 @@ private:
 
 	void LoadEncoderTypes();
 	void LoadColorRanges();
-	void LoadColorSpaces();
 	void LoadFormats();
 	void ReloadCodecs(const ff_format_desc *formatDesc);
-
-	void UpdateColorFormatSpaceWarning();
 
 	void LoadGeneralSettings();
 	void LoadStream1Settings();
@@ -253,15 +245,21 @@ private:
 
 	/* stream */
 	void InitStreamPage();
+	inline bool IsCustomService() const;
+	void LoadServices(bool showAll);
 	void OnOAuthStreamKeyConnected();
 	void OnAuthConnected();
+	QString lastService;
 	int prevLangIndex;
 	bool prevBrowserAccel;
 private slots:
+	void UpdateServerList();
+	void UpdateKeyLink();
 	void UpdateVodTrackSetting();
 	void UpdateServiceRecommendations();
 	void RecreateOutputResolutionWidget();
 	void UpdateResFPSLimits();
+	void UpdateMoreInfoLink();
 	void DisplayEnforceWarning(bool checked);
 	void on_show_clicked();
 	void on_authPwShow_clicked();
@@ -362,7 +360,6 @@ private slots:
 	void on_advOutFFType_currentIndexChanged(int idx);
 
 	void on_colorFormat_currentIndexChanged(const QString &text);
-	void on_colorSpace_currentIndexChanged(const QString &text);
 
 	void on_filenameFormatting_textEdited(const QString &text);
 	void on_outputResolution_editTextChanged(const QString &text);
@@ -390,11 +387,8 @@ private slots:
 
 	void UpdateStreamDelayEstimate();
 
-	void UpdateAdvNetworkGroup();
-
 	void UpdateAutomaticReplayBufferCheckboxes();
 
-	void AdvOutSplitFileChanged();
 	void AdvOutRecCheckWarnings();
 
 	void SimpleRecordingQualityChanged();

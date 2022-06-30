@@ -124,6 +124,7 @@ void preview_output_stop()
 {
 	obs_output_stop(context.output);
 	obs_output_release(context.output);
+	video_output_stop(context.video_queue);
 
 	obs_remove_main_render_callback(render_preview_source, &context);
 	obs_frontend_remove_event_callback(on_preview_scene_changed, &context);
@@ -339,6 +340,10 @@ static void OBSEvent(enum obs_frontend_event event, void *)
 
 bool obs_module_load(void)
 {
+	addOutputUI();
+
+	obs_frontend_add_event_callback(OBSEvent, nullptr);
+
 	return true;
 }
 
@@ -351,14 +356,4 @@ void obs_module_unload(void)
 
 	if (main_output_running)
 		output_stop();
-}
-
-void obs_module_post_load(void)
-{
-	if (!obs_get_module("decklink"))
-		return;
-
-	addOutputUI();
-
-	obs_frontend_add_event_callback(OBSEvent, nullptr);
 }

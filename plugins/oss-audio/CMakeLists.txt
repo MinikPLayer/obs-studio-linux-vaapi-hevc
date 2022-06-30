@@ -1,27 +1,37 @@
 project(oss-audio)
 
-option(ENABLE_OSS "Enable building with OSS audio support" ON)
-
-if(NOT ENABLE_OSS)
-  obs_status(DISABLED "oss-audio")
-  return()
+if(DISABLE_OSS)
+	message(STATUS "OSS support disabled")
+	return()
 endif()
 
-find_package(OSS REQUIRED)
+find_package(OSS)
+if(NOT OSS_FOUND AND ENABLE_OSS)
+	message(FATAL_ERROR "OSS not found but set as enabled")
+elseif(NOT OSS_FOUND)
+	message(STATUS "OSS not found, disabling OSS plugin")
+	return()
+endif()
 
-add_library(oss-audio MODULE)
-add_library(OBS::oss-audio ALIAS oss-audio)
+configure_file(oss-platform.h.in oss-platform.h)
 
-target_sources(oss-audio PRIVATE oss-audio.c oss-input.c)
+include_directories(
+	SYSTEM "${CMAKE_SOURCE_DIR}/libobs"
+	"${OSS_INCLUDE_DIR}"
+	"${CMAKE_CURRENT_BINARY_DIR}"
+)
 
-target_link_libraries(oss-audio PRIVATE OBS::libobs OSS::OSS)
+set(oss-audio_SOURCES
+	oss-audio.c
+	oss-input.c
+)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/oss-platform.h.in oss-platform.h)
-
-target_include_directories(oss-audio PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-
-target_sources(oss-audio PRIVATE oss-platform.h)
-
+add_library(oss-audio MODULE
+	${oss-audio_SOURCES}
+)
+target_link_libraries(oss-audio
+	libobs
+)
 set_target_properties(oss-audio PROPERTIES FOLDER "plugins")
 
-setup_plugin_target(oss-audio)
+install_obs_plugin_with_data(oss-audio data)

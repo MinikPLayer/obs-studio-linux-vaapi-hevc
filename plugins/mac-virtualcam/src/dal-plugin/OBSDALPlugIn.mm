@@ -96,6 +96,7 @@ typedef enum {
 
 - (void)startStream
 {
+	DLogFunc(@"");
 	dispatch_async(_stateQueue, ^{
 		if (_state == PlugInStateNotStarted) {
 			dispatch_resume(_machConnectTimer);
@@ -107,6 +108,7 @@ typedef enum {
 
 - (void)stopStream
 {
+	DLogFunc(@"");
 	dispatch_async(_stateQueue, ^{
 		if (_state == PlugInStateWaitingForServer) {
 			dispatch_suspend(_machConnectTimer);
@@ -203,21 +205,19 @@ typedef enum {
 
 #pragma mark - MachClientDelegate
 
-- (void)receivedPixelBuffer:(CVPixelBufferRef)frame
-		  timestamp:(uint64_t)timestamp
-	       fpsNumerator:(uint32_t)fpsNumerator
-	     fpsDenominator:(uint32_t)fpsDenominator
+- (void)receivedFrameWithSize:(NSSize)size
+		    timestamp:(uint64_t)timestamp
+		 fpsNumerator:(uint32_t)fpsNumerator
+	       fpsDenominator:(uint32_t)fpsDenominator
+		    frameData:(NSData *)frameData
 {
-	size_t width = CVPixelBufferGetWidth(frame);
-	size_t height = CVPixelBufferGetHeight(frame);
-
 	dispatch_sync(_stateQueue, ^{
 		if (_state == PlugInStateWaitingForServer) {
 			NSUserDefaults *defaults =
 				[NSUserDefaults standardUserDefaults];
-			[defaults setInteger:(long)width
+			[defaults setInteger:size.width
 				      forKey:kTestCardWidthKey];
-			[defaults setInteger:(long)height
+			[defaults setInteger:size.height
 				      forKey:kTestCardHeightKey];
 			[defaults setDouble:(double)fpsNumerator /
 					    (double)fpsDenominator
@@ -236,10 +236,11 @@ typedef enum {
 		dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC),
 		5.0 * NSEC_PER_SEC, (1ull * NSEC_PER_SEC) / 10);
 
-	[self.stream queuePixelBuffer:frame
-			    timestamp:timestamp
-			 fpsNumerator:fpsNumerator
-		       fpsDenominator:fpsDenominator];
+	[self.stream queueFrameWithSize:size
+			      timestamp:timestamp
+			   fpsNumerator:fpsNumerator
+			 fpsDenominator:fpsDenominator
+			      frameData:frameData];
 }
 
 - (void)receivedStop

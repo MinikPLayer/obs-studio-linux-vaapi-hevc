@@ -2,85 +2,84 @@ cmake_minimum_required(VERSION 3.5)
 project(obs-virtualcam-module)
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-  set(_output_suffix "64")
+	set(_output_suffix "64")
 else()
-  set(_output_suffix "32")
+	set(_output_suffix "32")
 endif()
 
-add_library(obs-virtualcam-module MODULE)
-add_library(OBS::virtualcam-module ALIAS obs-virtualcam-module)
-
-target_sources(
-  obs-virtualcam-module
-  PRIVATE sleepto.c
-          sleepto.h
-          placeholder.cpp
-          virtualcam-module.cpp
-          virtualcam-filter.cpp
-          virtualcam-filter.hpp
-          virtualcam-module.rc
-          ../shared-memory-queue.c
-          ../shared-memory-queue.h
-          ../tiny-nv12-scale.c
-          ../tiny-nv12-scale.h)
-
-target_include_directories(obs-virtualcam-module
-                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+configure_file(
+	"${CMAKE_CURRENT_SOURCE_DIR}/virtualcam-module.def.in"
+	"${CMAKE_CURRENT_BINARY_DIR}/virtualcam-module.def")
 
 set(MODULE_DESCRIPTION "OBS Virtual Camera output module")
+configure_file(${CMAKE_SOURCE_DIR}/cmake/winrc/obs-module.rc.in virtualcam-module.rc)
 
-configure_file(${CMAKE_SOURCE_DIR}/cmake/bundle/windows/obs-module.rc.in
-               virtualcam-module.rc)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/..)
 
-target_sources(obs-virtualcam-module PRIVATE virtualcam-module.rc)
+set(libdshowcapture_SOURCES
+	../libdshowcapture/source/log.cpp
+	../libdshowcapture/source/dshow-base.cpp
+	../libdshowcapture/source/dshow-enum.cpp
+	../libdshowcapture/source/dshow-formats.cpp
+	../libdshowcapture/source/dshow-media-type.cpp
+	../libdshowcapture/source/output-filter.cpp
+	)
 
-target_link_libraries(
-  obs-virtualcam-module PRIVATE OBS::libdshowcapture setupapi winmm strmiids
-                                gdiplus)
+set(libdshowcapture_HEADERS
+	../libdshowcapture/source/ComPtr.hpp
+	../libdshowcapture/source/CoTaskMemPtr.hpp
+	../libdshowcapture/source/log.hpp
+	../libdshowcapture/source/dshow-base.hpp
+	../libdshowcapture/source/dshow-enum.hpp
+	../libdshowcapture/source/dshow-formats.hpp
+	../libdshowcapture/source/dshow-media-type.hpp
+	../libdshowcapture/source/output-filter.hpp
+	../libdshowcapture/dshowcapture.hpp
+	)
 
-target_link_options(obs-virtualcam-module PRIVATE "LINKER:/ignore:4104")
+set(obs-virtualcam-module_SOURCES
+	"${CMAKE_CURRENT_BINARY_DIR}/virtualcam-module.def"
+	sleepto.c
+	placeholder.cpp
+	virtualcam-module.cpp
+	virtualcam-filter.cpp
+	virtualcam-module.rc
+	../shared-memory-queue.c
+	../tiny-nv12-scale.c
+	)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/virtualcam-module.def.in
-               ${CMAKE_CURRENT_BINARY_DIR}/virtualcam-module.def)
-
-target_sources(obs-virtualcam-module
-               PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/virtualcam-module.def)
-
-target_include_directories(obs-virtualcam-module
-                           PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/../config)
-
-target_compile_definitions(
-  obs-virtualcam-module
-  PRIVATE VIRTUALCAM_AVAILABLE UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS
-          _CRT_NONSTDC_NO_WARNINGS)
+set(obs-virtualcam-module_HEADERS
+	sleepto.h
+	virtualcam-filter.hpp
+	../shared-memory-queue.h
+	../tiny-nv12-scale.h
+	)
 
 if(MSVC)
-  target_compile_options(obs-virtualcam-module
-                         PRIVATE "$<IF:$<CONFIG:Debug>,/MTd,/MT>")
-  add_target_resource(win-dshow "$<TARGET_PDB_FILE:obs-virtualcam-module>"
-                      "obs-plugins/win-dshow/" OPTIONAL)
-
+	add_compile_options("$<IF:$<CONFIG:Debug>,/MTd,/MT>")
 endif()
 
-get_target_property(_LIBDSHOW_SOURCES OBS::libdshowcapture INTERFACE_SOURCES)
+include_directories(${CMAKE_SOURCE_DIR}/libobs/util)
 
-foreach(_LIBDSHOW_SOURCE ${_LIBDSHOW_SOURCES})
-  get_filename_component(_EXT ${_LIBDSHOW_SOURCE} EXT)
-  if(${_EXT} STREQUAL "hpp" OR ${_EXT} STREQUAL "h")
-    source_group("libdshowcapture\\Header Files" FILES ${_LIBDSHOW_SOURCE})
-  elseif(${_EXT} STREQUAL "cpp" OR ${_EXT} STREQUAL "c")
-    source_group("libdshowcapture\\Source Files" FILES ${_LIBDSHOW_SOURCE})
-  endif()
-endforeach()
-unset(_LIBDSHOW_SOURCE)
-unset(_LIBDSHOW_SOURCES)
+source_group("libdshowcapture\\Source Files" FILES ${libdshowcapture_SOURCES})
+source_group("libdshowcapture\\Header Files" FILES ${libdshowcapture_HEADERS})
 
-set_target_properties(obs-virtualcam-module PROPERTIES FOLDER
-                                                       "plugins/win-dshow")
+set(CMAKE_MODULE_LINKER_FLAGS "${MAKE_MODULE_LINKER_FLAGS} /ignore:4104")
 
-set_target_properties(
-  obs-virtualcam-module PROPERTIES OUTPUT_NAME
-                                   "obs-virtualcam-module${_output_suffix}")
+add_library(obs-virtualcam-module MODULE
+	${libdshowcapture_SOURCES}
+	${libdshowcapture_HEADERS}
+	${obs-virtualcam-module_SOURCES}
+	${obs-virtualcam-module_HEADERS})
+target_link_libraries(obs-virtualcam-module
+	setupapi
+	winmm
+	strmiids
+	gdiplus
+	)
+set_target_properties(obs-virtualcam-module PROPERTIES FOLDER "plugins/win-dshow")
 
-add_target_resource(win-dshow "$<TARGET_FILE:obs-virtualcam-module>"
-                    "obs-plugins/win-dshow/")
+set_target_properties(obs-virtualcam-module
+	PROPERTIES
+		OUTPUT_NAME "obs-virtualcam-module${_output_suffix}")
+install_obs_datatarget(obs-virtualcam-module "obs-plugins/win-dshow")

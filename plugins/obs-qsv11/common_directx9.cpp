@@ -393,6 +393,7 @@ mfxStatus _dx9_simple_alloc(mfxFrameAllocRequest *request,
 			if (FAILED(hr)) {
 				_dx9_simple_free(response);
 				MSDK_SAFE_FREE(dxMids);
+				MSDK_SAFE_FREE(dxMidPtrs);
 				return MFX_ERR_MEMORY_ALLOC;
 			}
 			dxMidPtrs[i] = &dxMids[i];

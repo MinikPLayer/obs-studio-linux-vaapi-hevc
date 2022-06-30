@@ -194,13 +194,6 @@ Sleep/Time Functions
 
 ---------------------
 
-.. function:: bool os_sleepto_ns_fast(uint64_t time_target)
-
-   Sleeps to a specific time without high precision, in nanoseconds.
-   The function won't return until reaching the specific time.
-
----------------------
-
 .. function:: void os_sleep_ms(uint32_t duration)
 
    Sleeps for a specific number of milliseconds.
@@ -478,12 +471,3 @@ Other Functions
 .. function:: uint64_t os_get_proc_virtual_size(void)
 
    Returns the virtual memory size of the current process.
-
----------------------
-
-.. function:: bool os_get_emulation_status(void)
-
-   Returns true if the current process is a x64 binary and is being emulated or translated
-   by the host operating system. On macOS, it returns true when a x64 binary is 
-   being translated by Rosetta and running on Apple Silicon Macs. This function is not yet
-   implemented on Windows and Linux and will always return false on those platforms.

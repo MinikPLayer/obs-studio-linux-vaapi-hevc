@@ -39,7 +39,7 @@ public slots:
 class BrowserToolbar : public SourceToolbar {
 	Q_OBJECT
 
-	std::unique_ptr<Ui_BrowserSourceToolbar> ui;
+	Ui_BrowserSourceToolbar *ui;
 
 public:
 	BrowserToolbar(QWidget *parent, OBSSource source);
@@ -53,7 +53,7 @@ class ComboSelectToolbar : public SourceToolbar {
 	Q_OBJECT
 
 protected:
-	std::unique_ptr<Ui_DeviceSelectToolbar> ui;
+	Ui_DeviceSelectToolbar *ui;
 	const char *prop_name;
 	bool is_int = false;
 
@@ -95,7 +95,7 @@ class DeviceCaptureToolbar : public QWidget {
 
 	OBSWeakSource weakSource;
 
-	std::unique_ptr<Ui_DeviceSelectToolbar> ui;
+	Ui_DeviceSelectToolbar *ui;
 	const char *activateText;
 	const char *deactivateText;
 	bool active;
@@ -111,7 +111,7 @@ public slots:
 class GameCaptureToolbar : public SourceToolbar {
 	Q_OBJECT
 
-	std::unique_ptr<Ui_GameCaptureToolbar> ui;
+	Ui_GameCaptureToolbar *ui;
 
 	void UpdateWindowVisibility();
 
@@ -127,7 +127,7 @@ public slots:
 class ImageSourceToolbar : public SourceToolbar {
 	Q_OBJECT
 
-	std::unique_ptr<Ui_ImageSourceToolbar> ui;
+	Ui_ImageSourceToolbar *ui;
 
 public:
 	ImageSourceToolbar(QWidget *parent, OBSSource source);
@@ -140,7 +140,7 @@ public slots:
 class ColorSourceToolbar : public SourceToolbar {
 	Q_OBJECT
 
-	std::unique_ptr<Ui_ColorSourceToolbar> ui;
+	Ui_ColorSourceToolbar *ui;
 	QColor color;
 
 	void UpdateColor();
@@ -156,7 +156,7 @@ public slots:
 class TextSourceToolbar : public SourceToolbar {
 	Q_OBJECT
 
-	std::unique_ptr<Ui_TextSourceToolbar> ui;
+	Ui_TextSourceToolbar *ui;
 	QFont font;
 	QColor color;
 

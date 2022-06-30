@@ -97,7 +97,10 @@ BrowserToolbar::BrowserToolbar(QWidget *parent, OBSSource source)
 	ui->setupUi(this);
 }
 
-BrowserToolbar::~BrowserToolbar() {}
+BrowserToolbar::~BrowserToolbar()
+{
+	delete ui;
+}
 
 void BrowserToolbar::on_refresh_clicked()
 {
@@ -118,7 +121,10 @@ ComboSelectToolbar::ComboSelectToolbar(QWidget *parent, OBSSource source)
 	ui->setupUi(this);
 }
 
-ComboSelectToolbar::~ComboSelectToolbar() {}
+ComboSelectToolbar::~ComboSelectToolbar()
+{
+	delete ui;
+}
 
 static int FillPropertyCombo(QComboBox *c, obs_property_t *p,
 			     const std::string &cur_id, bool is_int = false)
@@ -229,8 +235,9 @@ void AudioCaptureToolbar::Init()
 
 	obs_module_t *mod =
 		get_os_module("win-wasapi", "mac-capture", "linux-pulseaudio");
-	if (!mod)
+	if (!mod) {
 		return;
+	}
 
 	const char *device_str =
 		get_os_text(mod, "Device", "CoreAudio.Device", "Device");
@@ -253,9 +260,6 @@ void WindowCaptureToolbar::Init()
 
 	obs_module_t *mod =
 		get_os_module("win-capture", "mac-capture", "linux-capture");
-	if (!mod)
-		return;
-
 	const char *device_str = get_os_text(mod, "WindowCapture.Window",
 					     "WindowUtils.Window", "Window");
 	ui->deviceLabel->setText(device_str);
@@ -285,9 +289,6 @@ void DisplayCaptureToolbar::Init()
 
 	obs_module_t *mod =
 		get_os_module("win-capture", "mac-capture", "linux-capture");
-	if (!mod)
-		return;
-
 	const char *device_str =
 		get_os_text(mod, "Monitor", "DisplayCapture.Display", "Screen");
 	ui->deviceLabel->setText(device_str);
@@ -331,7 +332,10 @@ DeviceCaptureToolbar::DeviceCaptureToolbar(QWidget *parent, OBSSource source)
 	ui->activateButton->setText(active ? deactivateText : activateText);
 }
 
-DeviceCaptureToolbar::~DeviceCaptureToolbar() {}
+DeviceCaptureToolbar::~DeviceCaptureToolbar()
+{
+	delete ui;
+}
 
 void DeviceCaptureToolbar::on_activateButton_clicked()
 {
@@ -402,7 +406,10 @@ GameCaptureToolbar::GameCaptureToolbar(QWidget *parent, OBSSource source)
 	UpdateWindowVisibility();
 }
 
-GameCaptureToolbar::~GameCaptureToolbar() {}
+GameCaptureToolbar::~GameCaptureToolbar()
+{
+	delete ui;
+}
 
 void GameCaptureToolbar::UpdateWindowVisibility()
 {
@@ -462,7 +469,10 @@ ImageSourceToolbar::ImageSourceToolbar(QWidget *parent, OBSSource source)
 	ui->path->setText(file.c_str());
 }
 
-ImageSourceToolbar::~ImageSourceToolbar() {}
+ImageSourceToolbar::~ImageSourceToolbar()
+{
+	delete ui;
+}
 
 void ImageSourceToolbar::on_browse_clicked()
 {
@@ -520,7 +530,10 @@ ColorSourceToolbar::ColorSourceToolbar(QWidget *parent, OBSSource source)
 	UpdateColor();
 }
 
-ColorSourceToolbar::~ColorSourceToolbar() {}
+ColorSourceToolbar::~ColorSourceToolbar()
+{
+	delete ui;
+}
 
 void ColorSourceToolbar::UpdateColor()
 {
@@ -610,7 +623,10 @@ TextSourceToolbar::TextSourceToolbar(QWidget *parent, OBSSource source)
 		ui->text->setText(text);
 }
 
-TextSourceToolbar::~TextSourceToolbar() {}
+TextSourceToolbar::~TextSourceToolbar()
+{
+	delete ui;
+}
 
 void TextSourceToolbar::on_selectFont_clicked()
 {

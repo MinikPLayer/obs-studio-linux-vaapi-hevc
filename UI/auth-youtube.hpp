@@ -8,27 +8,7 @@
 #include "auth-oauth.hpp"
 
 #ifdef BROWSER_AVAILABLE
-#include "window-dock-browser.hpp"
-#include "lineedit-autoresize.hpp"
-#include <QHBoxLayout>
-class YoutubeChatDock : public BrowserDock {
-	Q_OBJECT
-
-private:
-	std::string apiChatId;
-	LineEditAutoResize *lineEdit;
-	QPushButton *sendButton;
-	QHBoxLayout *chatLayout;
-
-public:
-	void SetWidget(QCefWidget *widget_);
-	void SetApiChatId(const std::string &id);
-
-private slots:
-	void SendChatMessage();
-	void ShowErrorMessage(const QString &error);
-	void EnableChatInput();
-};
+class BrowserDock;
 #endif
 
 inline const std::vector<Auth::Def> youtubeServices = {
@@ -44,7 +24,7 @@ class YoutubeAuth : public OAuthStreamKey {
 	std::string section;
 
 #ifdef BROWSER_AVAILABLE
-	QSharedPointer<YoutubeChatDock> chat;
+	QSharedPointer<BrowserDock> chat;
 	QSharedPointer<QAction> chatMenu;
 #endif
 
@@ -58,7 +38,7 @@ class YoutubeAuth : public OAuthStreamKey {
 public:
 	YoutubeAuth(const Def &d);
 
-	void SetChatId(const QString &chat_id, const std::string &api_chat_id);
+	void SetChatId(QString &chat_id);
 	void ResetChat();
 
 	static std::shared_ptr<Auth> Login(QWidget *parent,

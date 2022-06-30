@@ -27,6 +27,9 @@ class QWidget;
 /* Gets the path of obs-studio specific data files (such as locale) */
 bool GetDataFilePath(const char *data, std::string &path);
 
+/* Updates the working directory for OSX application bundles */
+bool InitApplicationBundle();
+
 std::string GetDefaultVideoSavePath();
 
 std::vector<std::string> GetPreferredLocales();
@@ -35,22 +38,6 @@ bool IsAlwaysOnTop(QWidget *window);
 void SetAlwaysOnTop(QWidget *window, bool enable);
 
 bool SetDisplayAffinitySupported(void);
-
-enum TaskbarOverlayStatus {
-	TaskbarOverlayStatusInactive,
-	TaskbarOverlayStatusActive,
-	TaskbarOverlayStatusPaused,
-};
-void TaskbarOverlayInit();
-void TaskbarOverlaySetStatus(TaskbarOverlayStatus status);
-
-#ifdef _WIN32
-class RunOnceMutex;
-RunOnceMutex
-#else
-void
-#endif
-CheckIfAlreadyRunning(bool &already_running);
 
 #ifdef _WIN32
 uint32_t GetWindowsVersion();
@@ -75,6 +62,7 @@ public:
 	RunOnceMutex &operator=(RunOnceMutex &&rom);
 };
 
+RunOnceMutex GetRunOnceMutex(bool &already_running);
 QString GetMonitorName(const QString &id);
 bool IsRunningOnWine();
 #endif
@@ -82,7 +70,14 @@ bool IsRunningOnWine();
 #ifdef __APPLE__
 void EnableOSXVSync(bool enable);
 void EnableOSXDockIcon(bool enable);
-bool isInBundle();
 void InstallNSApplicationSubclass();
 void disableColorSpaceConversion(QWidget *window);
+void CheckAppWithSameBundleID(bool &already_running);
+bool ProcessIsRosettaTranslated();
+#endif
+#ifdef __linux__
+void RunningInstanceCheck(bool &already_running);
+#endif
+#if defined(__FreeBSD__) || defined(__DragonFly__)
+void PIDFileCheck(bool &already_running);
 #endif

@@ -328,8 +328,7 @@ extern "C"
         int swfAge;
 
         int protocol;
-        int receiveTimeout;	/* connection receive timeout in seconds */
-        int sendTimeout;	/* connection send timeout in seconds */
+        int timeout;		/* connection timeout in seconds */
 
 #define RTMP_PUB_NAME   0x0001  /* send login to server */
 #define RTMP_PUB_RESP   0x0002  /* send salted password hash */
@@ -343,6 +342,10 @@ extern "C"
 
 #ifdef CRYPTO
 #define RTMP_SWF_HASHLEN	32
+        void *dh;			/* for encryption */
+        void *rc4keyIn;
+        void *rc4keyOut;
+
         uint32_t SWFSize;
         uint8_t SWFHash[RTMP_SWF_HASHLEN];
         char SWFVerificationResponse[RTMP_SWF_HASHLEN+10];
@@ -510,7 +513,6 @@ extern "C"
     void RTMP_Reset(RTMP *r);
     void RTMP_Close(RTMP *r);
     RTMP *RTMP_Alloc(void);
-    void RTMP_TLS_Init(RTMP *r);
     void RTMP_TLS_Free(RTMP *r);
     void RTMP_Free(RTMP *r);
     void RTMP_EnableWrite(RTMP *r);

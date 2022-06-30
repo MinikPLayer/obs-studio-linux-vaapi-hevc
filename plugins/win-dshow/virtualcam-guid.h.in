@@ -3,7 +3,7 @@
 #include <windows.h>
 #include <initguid.h>
 
-#ifdef VIRTUALCAM_AVAILABLE
+#ifdef VIRTUALCAM_ENABLED
 DEFINE_GUID(CLSID_OBS_VirtualVideo,
             0x@GUID_VAL01@,
             0x@GUID_VAL02@,

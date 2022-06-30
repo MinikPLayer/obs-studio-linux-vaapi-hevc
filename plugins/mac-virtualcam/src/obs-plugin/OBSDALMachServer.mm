@@ -7,7 +7,6 @@
 
 #import "OBSDALMachServer.h"
 #include <obs-module.h>
-#include <CoreVideo/CoreVideo.h>
 #include "MachProtocol.h"
 #include "Defines.h"
 
@@ -101,24 +100,19 @@
 				     receivePort:nil
 				      components:components];
 			message.msgid = msgId;
-			if (![port isValid] ||
-			    ![message
+			if (![message
 				    sendBeforeDate:
 					    [NSDate dateWithTimeIntervalSinceNow:
 							    1.0]]) {
 				blog(LOG_DEBUG,
 				     "failed to send message to %d, removing it from the clients!",
 				     ((NSMachPort *)port).machPort);
-
-				[port invalidate];
 				[removedPorts addObject:port];
 			}
 		} @catch (NSException *exception) {
 			blog(LOG_DEBUG,
 			     "failed to send message (exception) to %d, removing it from the clients!",
 			     ((NSMachPort *)port).machPort);
-
-			[port invalidate];
 			[removedPorts addObject:port];
 		}
 	}
@@ -127,16 +121,23 @@
 	[self.clientPorts minusSet:removedPorts];
 }
 
-- (void)sendPixelBuffer:(CVPixelBufferRef)frame
-	      timestamp:(uint64_t)timestamp
-	   fpsNumerator:(uint32_t)fpsNumerator
-	 fpsDenominator:(uint32_t)fpsDenominator
+- (void)sendFrameWithSize:(NSSize)size
+		timestamp:(uint64_t)timestamp
+	     fpsNumerator:(uint32_t)fpsNumerator
+	   fpsDenominator:(uint32_t)fpsDenominator
+	       frameBytes:(uint8_t *)frameBytes
 {
 	if ([self.clientPorts count] <= 0) {
 		return;
 	}
 
 	@autoreleasepool {
+		CGFloat width = size.width;
+		NSData *widthData = [NSData dataWithBytes:&width
+						   length:sizeof(width)];
+		CGFloat height = size.height;
+		NSData *heightData = [NSData dataWithBytes:&height
+						    length:sizeof(height)];
 		NSData *timestampData = [NSData
 			dataWithBytes:&timestamp
 			       length:sizeof(timestamp)];
@@ -147,33 +148,22 @@
 			dataWithBytes:&fpsDenominator
 			       length:sizeof(fpsDenominator)];
 
-		IOSurfaceRef surface = CVPixelBufferGetIOSurface(frame);
-
-		if (!surface) {
-			blog(LOG_ERROR,
-			     "unable to access IOSurface associated with CVPixelBuffer");
-			return;
-		}
-
-		mach_port_t framePort = IOSurfaceCreateMachPort(surface);
-
-		if (!framePort) {
-			blog(LOG_ERROR,
-			     "unable to allocate mach port for IOSurface");
-			return;
-		}
-
+		// NOTE: I'm not totally sure about the safety of dataWithBytesNoCopy in this context.
+		// Seems like there could potentially be an issue if the frameBuffer went away before the
+		// mach message finished sending. But it seems to be working and avoids a memory copy. Alternately
+		// we could do something like
+		// NSData *frameData = [NSData dataWithBytes:(void *)frameBytes length:size.width * size.height * 2];
+		NSData *frameData = [NSData
+			dataWithBytesNoCopy:(void *)frameBytes
+				     length:size.width * size.height * 2
+			       freeWhenDone:NO];
 		[self sendMessageToClientsWithMsgId:MachMsgIdFrame
 					 components:@[
-						 [NSMachPort
-							 portWithMachPort:framePort
-								  options:NSMachPortDeallocateNone],
-						 timestampData,
+						 widthData, heightData,
+						 timestampData, frameData,
 						 fpsNumeratorData,
 						 fpsDenominatorData
 					 ]];
-
-		mach_port_deallocate(mach_task_self(), framePort);
 	}
 }
 

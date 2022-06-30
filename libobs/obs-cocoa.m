@@ -38,30 +38,44 @@ bool is_in_bundle()
 
 const char *get_module_extension(void)
 {
-	return "";
+	return ".so";
 }
+
+static const char *module_bin[] = {
+	"../obs-plugins",
+	OBS_INSTALL_PREFIX "obs-plugins",
+};
+
+static const char *module_data[] = {
+	"../data/obs-plugins/%module%",
+	OBS_INSTALL_DATA_PATH "obs-plugins/%module%",
+};
+
+static const int module_patterns_size =
+	sizeof(module_bin) / sizeof(module_bin[0]);
 
 void add_default_module_paths(void)
 {
-	struct dstr plugin_path;
+	for (int i = 0; i < module_patterns_size; i++)
+		obs_add_module_path(module_bin[i], module_data[i]);
 
-	dstr_init_move_array(&plugin_path, os_get_executable_path_ptr(""));
-	dstr_cat(&plugin_path, "../PlugIns");
-	char *abs_plugin_path = os_get_abs_path_ptr(plugin_path.array);
+	if (is_in_bundle()) {
+		NSRunningApplication *app =
+			[NSRunningApplication currentApplication];
+		NSURL *bundleURL = [app bundleURL];
+		NSURL *pluginsURL = [bundleURL
+			URLByAppendingPathComponent:@"Contents/PlugIns"];
+		NSURL *dataURL = [bundleURL
+			URLByAppendingPathComponent:
+				@"Contents/Resources/data/obs-plugins/%module%"];
 
-	if (abs_plugin_path != NULL) {
-		dstr_move_array(&plugin_path, abs_plugin_path);
-		struct dstr plugin_data;
-		dstr_init_copy_dstr(&plugin_data, &plugin_path);
-		dstr_cat(&plugin_path, "/%module%.plugin/Contents/MacOS/");
-		dstr_cat(&plugin_data, "/%module%.plugin/Contents/Resources/");
+		const char *binPath = [[pluginsURL path]
+			cStringUsingEncoding:NSUTF8StringEncoding];
+		const char *dataPath = [[dataURL path]
+			cStringUsingEncoding:NSUTF8StringEncoding];
 
-		obs_add_module_path(plugin_path.array, plugin_data.array);
-
-		dstr_free(&plugin_data);
+		obs_add_module_path(binPath, dataPath);
 	}
-
-	dstr_free(&plugin_path);
 }
 
 char *find_libobs_data_file(const char *file)
@@ -69,11 +83,12 @@ char *find_libobs_data_file(const char *file)
 	struct dstr path;
 
 	if (is_in_bundle()) {
-		NSBundle *frameworkBundle = [NSBundle
-			bundleWithIdentifier:@"com.obsproject.libobs"];
-		NSURL *bundleURL = [frameworkBundle bundleURL];
+		NSRunningApplication *app =
+			[NSRunningApplication currentApplication];
+		NSURL *bundleURL = [app bundleURL];
 		NSURL *libobsDataURL =
-			[bundleURL URLByAppendingPathComponent:@"Resources/"];
+			[bundleURL URLByAppendingPathComponent:
+					   @"Contents/Resources/data/libobs/"];
 		const char *libobsDataPath = [[libobsDataURL path]
 			cStringUsingEncoding:NSUTF8StringEncoding];
 		dstr_init_copy(&path, libobsDataPath);

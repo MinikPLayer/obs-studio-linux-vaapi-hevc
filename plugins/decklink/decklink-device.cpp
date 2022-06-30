@@ -49,9 +49,9 @@ bool DeckLinkDevice::Init()
 	ComPtr<IDeckLinkInput> input;
 	if (device->QueryInterface(IID_IDeckLinkInput, (void **)&input) ==
 	    S_OK) {
-		ComPtr<IDeckLinkDisplayModeIterator> modeIterator;
+		IDeckLinkDisplayModeIterator *modeIterator;
 		if (input->GetDisplayModeIterator(&modeIterator) == S_OK) {
-			ComPtr<IDeckLinkDisplayMode> displayMode;
+			IDeckLinkDisplayMode *displayMode;
 			long long modeId = 1;
 
 			while (modeIterator->Next(&displayMode) == S_OK) {
@@ -63,8 +63,11 @@ bool DeckLinkDevice::Init()
 							       modeId);
 				inputModes.push_back(mode);
 				inputModeIdMap[modeId] = mode;
+				displayMode->Release();
 				++modeId;
 			}
+
+			modeIterator->Release();
 		}
 	}
 
@@ -85,9 +88,9 @@ bool DeckLinkDevice::Init()
 	if (device->QueryInterface(IID_IDeckLinkOutput, (void **)&output) ==
 	    S_OK) {
 
-		ComPtr<IDeckLinkDisplayModeIterator> modeIterator;
+		IDeckLinkDisplayModeIterator *modeIterator;
 		if (output->GetDisplayModeIterator(&modeIterator) == S_OK) {
-			ComPtr<IDeckLinkDisplayMode> displayMode;
+			IDeckLinkDisplayMode *displayMode;
 			long long modeId = 1;
 
 			while (modeIterator->Next(&displayMode) == S_OK) {
@@ -99,8 +102,11 @@ bool DeckLinkDevice::Init()
 							       modeId);
 				outputModes.push_back(mode);
 				outputModeIdMap[modeId] = mode;
+				displayMode->Release();
 				++modeId;
 			}
+
+			modeIterator->Release();
 		}
 	}
 

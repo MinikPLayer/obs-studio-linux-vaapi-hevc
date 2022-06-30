@@ -101,52 +101,29 @@
 		break;
 	case MachMsgIdFrame:
 		VLog(@"Received frame message");
-
-		if (components.count < 4)
-			return;
-
-		@autoreleasepool {
-			NSMachPort *framePort = (NSMachPort *)components[0];
-
-			if (!framePort)
-				return;
-
-			IOSurfaceRef surface = IOSurfaceLookupFromMachPort(
-				[framePort machPort]);
-			mach_port_deallocate(mach_task_self(),
-					     [framePort machPort]);
-
-			if (!surface) {
-				ELog(@"Failed to obtain IOSurface from Mach port");
-				return;
-			}
-
-			CVPixelBufferRef frame;
-			CVPixelBufferCreateWithIOSurface(kCFAllocatorDefault,
-							 surface, NULL, &frame);
-			CFRelease(surface);
-
+		if (components.count >= 6) {
+			CGFloat width;
+			[components[0] getBytes:&width length:sizeof(width)];
+			CGFloat height;
+			[components[1] getBytes:&height length:sizeof(height)];
 			uint64_t timestamp;
-			[components[1] getBytes:&timestamp
+			[components[2] getBytes:&timestamp
 					 length:sizeof(timestamp)];
-
-			VLog(@"Received frame data: %zux%zu (%llu)",
-			     CVPixelBufferGetWidth(frame),
-			     CVPixelBufferGetHeight(frame), timestamp);
-
+			VLog(@"Received frame data: %fx%f (%llu)", width,
+			     height, timestamp);
+			NSData *frameData = components[3];
 			uint32_t fpsNumerator;
-			[components[2] getBytes:&fpsNumerator
+			[components[4] getBytes:&fpsNumerator
 					 length:sizeof(fpsNumerator)];
 			uint32_t fpsDenominator;
-			[components[3] getBytes:&fpsDenominator
+			[components[5] getBytes:&fpsDenominator
 					 length:sizeof(fpsDenominator)];
-
-			[self.delegate receivedPixelBuffer:frame
-						 timestamp:timestamp
-					      fpsNumerator:fpsNumerator
-					    fpsDenominator:fpsDenominator];
-
-			CVPixelBufferRelease(frame);
+			[self.delegate
+				receivedFrameWithSize:NSMakeSize(width, height)
+					    timestamp:timestamp
+					 fpsNumerator:fpsNumerator
+				       fpsDenominator:fpsDenominator
+					    frameData:frameData];
 		}
 		break;
 	case MachMsgIdStop:

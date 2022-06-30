@@ -35,6 +35,7 @@ float3 srgb_nonlinear_to_linear(float3 v)
 float4 PSFadeToColor(VertData v_in) : TARGET
 {
 	float4 rgba = lerp(tex.Sample(textureSampler, v_in.uv), color, swp);
+	rgba.rgb = srgb_nonlinear_to_linear(rgba.rgb);
 	return rgba;
 }
 

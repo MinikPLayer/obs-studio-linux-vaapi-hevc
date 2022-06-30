@@ -1,10 +1,17 @@
 project(opts-parser)
 
-add_library(opts-parser INTERFACE)
-add_library(OBS::opts-parser ALIAS opts-parser)
+set(opts-parser_SOURCES
+	opts-parser.c)
+set(opts-parser_HEADERS
+	opts-parser.h)
 
-target_sources(opts-parser INTERFACE opts-parser.c opts-parser.h)
-
-target_link_libraries(opts-parser INTERFACE OBS::libobs)
-
-target_include_directories(opts-parser INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(opts-parser STATIC
+	${opts-parser_SOURCES}
+	${opts-parser_HEADERS})
+target_include_directories(opts-parser
+	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(opts-parser
+	libobs)
+set_target_properties(opts-parser PROPERTIES
+	FOLDER "deps"
+	POSITION_INDEPENDENT_CODE ON)

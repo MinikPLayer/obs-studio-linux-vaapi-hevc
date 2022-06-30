@@ -1,38 +1,39 @@
 project(get-graphics-offsets)
 
-add_executable(get-graphics-offsets)
+set(get-graphics-offsets_HEADERS
+	../graphics-hook-info.h
+	../hook-helpers.h
+	get-graphics-offsets.h)
 
-target_sources(
-  get-graphics-offsets
-  PRIVATE get-graphics-offsets.c
-          get-graphics-offsets.h
-          dxgi-offsets.cpp
-          d3d8-offsets.cpp
-          d3d9-offsets.cpp
-          ../graphics-hook-info.h
-          ../hook-helpers.h)
-
-target_include_directories(get-graphics-offsets
-                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
-
-target_link_libraries(get-graphics-offsets d3d9.lib dxgi.lib d3d11.lib)
+set(get-graphics-offsets_SOURCES
+	get-graphics-offsets.c
+	dxgi-offsets.cpp
+	d3d8-offsets.cpp
+	d3d9-offsets.cpp)
 
 if(MSVC)
-  target_compile_options(get-graphics-offsets
-                         PRIVATE "$<IF:$<CONFIG:Debug>,/MTd,/MT>")
-  add_target_resource(win-capture "$<TARGET_PDB_FILE:get-graphics-offsets>"
-                      "obs-plugins/win-capture/" OPTIONAL)
+	add_compile_options($<IF:$<CONFIG:Debug>,/MTd,/MT>)
 endif()
 
-set_target_properties(get-graphics-offsets PROPERTIES FOLDER
-                                                      "plugins/win-capture")
-set_target_properties(
-  get-graphics-offsets
-  PROPERTIES OUTPUT_NAME
-             "get-graphics-offsets$<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>,64,32>"
-)
+add_executable(get-graphics-offsets
+	${get-graphics-offsets_SOURCES}
+	${get-graphics-offsets_HEADERS})
 
-add_target_resource(win-capture "$<TARGET_FILE:get-graphics-offsets>"
-                    "obs-plugins/win-capture/")
+target_link_libraries(get-graphics-offsets
+	d3d9.lib
+	dxgi.lib
+	d3d11.lib)
 
-add_dependencies(win-capture get-graphics-offsets)
+set_target_properties(get-graphics-offsets PROPERTIES FOLDER "plugins/win-capture")
+
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+	set(_output_suffix "64")
+else()
+	set(_output_suffix "32")
+endif()
+
+set_target_properties(get-graphics-offsets
+	PROPERTIES
+		OUTPUT_NAME "get-graphics-offsets${_output_suffix}")
+
+install_obs_datatarget(get-graphics-offsets "obs-plugins/win-capture")

@@ -12,7 +12,6 @@ void MenuButton::keyPressEvent(QKeyEvent *event)
 			emit clicked();
 			return;
 		case Qt::Key_Down:
-		case Qt::Key_Space:
 			showMenu();
 			return;
 		}

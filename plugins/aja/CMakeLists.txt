@@ -1,67 +1,111 @@
 project(aja)
 
-option(ENABLE_AJA "Build OBS with aja support" ON)
-if(NOT ENABLE_AJA)
-  obs_status(DISABLED "aja")
-  return()
+if(DISABLE_AJA)
+	message(STATUS "aja plugin disabled")
+	return()
 endif()
 
-if(NOT OS_MACOS AND NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-  obs_status(STATUS "aja support not enabled (32-bit not supported).")
-  set(ENABLE_AJA
-      OFF
-      CACHE BOOL "Build OBS with aja support" FORCE)
-  return()
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+	find_package(LibAJANTV2)
+	if (NOT LIBAJANTV2_FOUND)
+		message(STATUS "aja plugin disabled (deps not found)")
+		return()
+	else()
+		message("aja plugin includes: ${LIBAJANTV2_INCLUDE_DIRS}")
+		message("aja plugin libs: ${LIBAJANTV2_LIBRARIES}")
+		message("aja plugin debug libs: ${LIBAJANTV2_DEBUG_LIBRARIES}")
+	endif()
+else()
+	message(STATUS "aja plugin disabled (32-bit not supported)")
+	return()
 endif()
 
-find_package(LibAJANTV2 REQUIRED)
+set(aja_INCLUDE_DIRS
+	${LIBAJANTV2_INCLUDE_DIRS})
+set(aja_LIBRARIES
+	$<IF:$<CONFIG:Debug>,${LIBAJANTV2_DEBUG_LIBRARIES},${LIBAJANTV2_LIBRARIES}>
+	libobs)
 
-add_library(aja MODULE)
-add_library(OBS::aja ALIAS aja)
+set(aja_SOURCES
+	main.cpp
+	aja-card-manager.cpp
+	aja-common.cpp
+	aja-output.cpp
+	aja-presets.cpp
+	aja-props.cpp
+	aja-routing.cpp
+	aja-source.cpp
+	aja-vpid-data.cpp
+	aja-widget-io.cpp)
 
-target_sources(
-  aja
-  PRIVATE main.cpp
-          aja-card-manager.cpp
-          aja-common.cpp
-          aja-common.hpp
-          aja-output.cpp
-          aja-enums.hpp
-          aja-output.hpp
-          aja-presets.cpp
-          aja-presets.hpp
-          aja-props.cpp
-          aja-props.hpp
-          aja-routing.cpp
-          aja-routing.hpp
-          aja-source.cpp
-          aja-source.hpp
-          aja-vpid-data.cpp
-          aja-vpid-data.hpp
-          aja-widget-io.cpp
-          aja-widget-io.hpp
-          aja-card-manager.hpp
-          aja-ui-props.hpp)
+set(aja_HEADERS
+	aja-card-manager.hpp
+	aja-common.hpp
+	aja-enums.hpp
+	aja-ui-props.hpp
+	aja-output.hpp
+	aja-presets.hpp
+	aja-props.hpp
+	aja-routing.hpp
+	aja-source.hpp
+	aja-vpid-data.hpp
+	aja-widget-io.hpp)
 
-target_link_libraries(aja PRIVATE OBS::libobs AJA::LibAJANTV2)
+# macOS
+if(APPLE)
+	set(aja_COMPILE_DEFS
+		AJAMac
+		AJA_MAC)
 
-if(OS_MACOS)
-  find_library(IOKIT IOKit)
-  find_library(COREFOUNDATION CoreFoundation)
-  find_library(APPKIT AppKit)
+	find_library(IOKIT_FRAMEWORK Iokit)
+	find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+	find_library(APPKIT_FRAMEWORK AppKit)
 
-  target_link_libraries(aja PRIVATE ${IOKIT} ${COREFOUNDATION} ${APPKIT})
-elseif(OS_WINDOWS)
-  set(MODULE_DESCRIPTION "OBS AJA Windows module")
-  configure_file(${CMAKE_SOURCE_DIR}/cmake/bundle/windows/obs-module.rc.in
-                 win-aja.rc)
+	list(APPEND aja_LIBRARIES
+		${IOKIT_FRAMEWORK}
+		${COREFOUNDATION_LIBRARY}
+		${APPKIT_FRAMEWORK})
+# Windows
+elseif(WIN32)
+	set(aja_COMPILE_DEFS
+		AJA_WINDOWS
+		_WINDOWS
+		WIN32
+		MSWindows)
 
-  target_sources(aja PRIVATE win-aja.rc)
+	if(CMAKE_BUILD_TYPE STREQUAL Debug)
+		list(APPEND aja_COMPILE_DEFS
+			_DEBUG)
+	else()
+		list(APPEND aja_COMPILE_DEFS
+			NDEBUG)
+	endif()
 
-  target_link_libraries(aja PRIVATE ws2_32.lib setupapi.lib Winmm.lib
-                                    netapi32.lib Shlwapi.lib)
+	list(APPEND aja_LIBRARIES
+		ws2_32.lib
+		setupapi.lib
+		Winmm.lib
+		netapi32.lib
+		Shlwapi.lib)
+
+	set(MODULE_DESCRIPTION "OBS AJA Windows module")
+	configure_file(${CMAKE_SOURCE_DIR}/cmake/winrc/obs-module.rc.in win-aja.rc)
+	list(APPEND aja_SOURCES
+		win-aja.rc)
+# Linux
+elseif(UNIX AND NOT APPLE)
+	set(aja_COMPILE_DEFS
+		AJA_LINUX
+		AJALinux)
 endif()
 
-set_target_properties(aja PROPERTIES FOLDER "plugins/aja" PREFIX "")
+add_library(aja MODULE ${aja_SOURCES} ${aja_HEADERS})
 
-setup_plugin_target(aja)
+target_include_directories(aja PUBLIC ${aja_INCLUDE_DIRS})
+target_link_libraries(aja PUBLIC ${aja_LIBRARIES})
+target_compile_definitions(aja PUBLIC ${aja_COMPILE_DEFS})
+
+set_target_properties(aja PROPERTIES FOLDER
+		"plugins")
+
+install_obs_plugin_with_data(aja data)

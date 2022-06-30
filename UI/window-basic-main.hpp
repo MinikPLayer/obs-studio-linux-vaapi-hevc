@@ -22,6 +22,9 @@
 #include <QThread>
 #include <QWidgetAction>
 #include <QSystemTrayIcon>
+#if defined(_WIN32) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+#include <QWinTaskbarButton>
+#endif
 #include <QStyledItemDelegate>
 #include <obs.hpp>
 #include <vector>
@@ -66,9 +69,6 @@ class OBSBasicStats;
 #define SIMPLE_ENCODER_X264_LOWCPU "x264_lowcpu"
 #define SIMPLE_ENCODER_QSV "qsv"
 #define SIMPLE_ENCODER_NVENC "nvenc"
-#ifdef ENABLE_HEVC
-#define SIMPLE_ENCODER_NVENC_HEVC "nvenc_hevc"
-#endif
 #define SIMPLE_ENCODER_AMD "amd"
 
 #define PREVIEW_EDGE_SIZE 10
@@ -94,8 +94,7 @@ struct SourceCopyInfo {
 	bool visible;
 	obs_sceneitem_crop crop;
 	obs_transform_info transform;
-	obs_blending_method blend_method;
-	obs_blending_type blend_mode;
+	obs_blending_type blend;
 };
 
 struct QuickTransition {
@@ -226,7 +225,6 @@ private:
 	obs_transform_info copiedTransformInfo;
 	obs_sceneitem_crop copiedCropInfo;
 	bool hasCopiedTransform = false;
-	OBSWeakSourceAutoRelease copySourceTransition;
 
 	bool closing = false;
 	QScopedPointer<QThread> devicePropertiesThread;
@@ -314,7 +312,6 @@ private:
 	QPointer<QMenu> sceneProjectorMenu;
 	QPointer<QMenu> sourceProjector;
 	QPointer<QMenu> scaleFilteringMenu;
-	QPointer<QMenu> blendingMethodMenu;
 	QPointer<QMenu> blendingModeMenu;
 	QPointer<QMenu> colorMenu;
 	QPointer<QWidgetAction> colorWidgetAction;
@@ -325,14 +322,16 @@ private:
 	QPointer<QAction> renameScene;
 	QPointer<QAction> renameSource;
 
+#if defined(_WIN32) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+	QWinTaskbarButton *taskBtn = new QWinTaskbarButton(this);
+#endif
+
 	QPointer<QWidget> programWidget;
 	QPointer<QVBoxLayout> programLayout;
 	QPointer<QLabel> programLabel;
 
 	QScopedPointer<QThread> patronJsonThread;
 	std::string patronJson;
-
-	std::atomic<obs_scene_t *> currentScene = nullptr;
 
 	void UpdateMultiviewProjectorMenu();
 
@@ -446,6 +445,9 @@ private:
 
 	void CreateProgramDisplay();
 	void CreateProgramOptions();
+	int TransitionCount();
+	int AddTransitionBeforeSeparator(const QString &name,
+					 obs_source_t *source);
 	void AddQuickTransitionId(int id);
 	void AddQuickTransition();
 	void AddQuickTransitionHotkey(QuickTransition *qt);
@@ -458,8 +460,6 @@ private:
 	void EnableTransitionWidgets(bool enable);
 	void CreateDefaultQuickTransitions();
 
-	void PasteShowHideTransition(obs_sceneitem_t *item, bool show,
-				     obs_source_t *tr);
 	QMenu *CreatePerSceneTransitionMenu();
 	QMenu *CreateVisibilityTransitionMenu(bool visible);
 
@@ -634,7 +634,6 @@ public slots:
 	void RecordingStart();
 	void RecordStopping();
 	void RecordingStop(int code, QString last_error);
-	void RecordingFileChanged(QString lastRecordingPath);
 
 	void ShowReplayBufferPauseWarning();
 	void StartReplayBuffer();
@@ -701,7 +700,7 @@ private slots:
 
 	void ProcessHotkey(obs_hotkey_id id, bool pressed);
 
-	void AddTransition();
+	void AddTransition(QString id);
 	void RenameTransition();
 	void TransitionClicked();
 	void TransitionStopped();
@@ -713,7 +712,6 @@ private slots:
 
 	void SetScaleFilter();
 
-	void SetBlendingMethod();
 	void SetBlendingMode();
 
 	void IconActivated(QSystemTrayIcon::ActivationReason reason);
@@ -803,7 +801,7 @@ private:
 
 	static void HotkeyTriggered(void *data, obs_hotkey_id id, bool pressed);
 
-	void AutoRemux(QString input, bool no_show = false);
+	void AutoRemux(QString input);
 
 	void UpdatePause(bool activate = true);
 	void UpdateReplayBuffer(bool activate = true);
@@ -889,7 +887,6 @@ public:
 
 	QMenu *AddDeinterlacingMenu(QMenu *menu, obs_source_t *source);
 	QMenu *AddScaleFilteringMenu(QMenu *menu, obs_sceneitem_t *item);
-	QMenu *AddBlendingMethodMenu(QMenu *menu, obs_sceneitem_t *item);
 	QMenu *AddBlendingModeMenu(QMenu *menu, obs_sceneitem_t *item);
 	QMenu *AddBackgroundColorMenu(QMenu *menu, QWidgetAction *widgetAction,
 				      ColorSelect *select,
@@ -950,13 +947,6 @@ public:
 
 protected:
 	virtual void closeEvent(QCloseEvent *event) override;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-	virtual bool nativeEvent(const QByteArray &eventType, void *message,
-				 qintptr *result) override;
-#else
-	virtual bool nativeEvent(const QByteArray &eventType, void *message,
-				 long *result) override;
-#endif
 	virtual void changeEvent(QEvent *event) override;
 
 private slots:
@@ -1063,8 +1053,7 @@ private slots:
 	void on_toggleSourceIcons_toggled(bool visible);
 
 	void on_transitions_currentIndexChanged(int index);
-	void on_transitionAdd_clicked();
-	void on_transitionRemove_clicked();
+	void RemoveTransitionClicked();
 	void on_transitionProps_clicked();
 	void on_transitionDuration_valueChanged(int value);
 	void on_tbar_position_valueChanged(int value);
@@ -1083,8 +1072,7 @@ private slots:
 	void on_stats_triggered();
 
 	void on_resetUI_triggered();
-	void on_resetDocks_triggered();
-	void on_lockDocks_toggled(bool lock);
+	void on_lockUI_toggled(bool lock);
 
 	void PauseToggled();
 
@@ -1117,10 +1105,6 @@ private slots:
 	void NudgeDown();
 	void NudgeLeft();
 	void NudgeRight();
-	void NudgeUpFar();
-	void NudgeDownFar();
-	void NudgeLeftFar();
-	void NudgeRightFar();
 
 	void OpenStudioProgramProjector();
 	void OpenPreviewProjector();
@@ -1135,6 +1119,8 @@ private slots:
 	void OpenSceneWindow();
 
 	void StackedMixerAreaContextMenuRequested();
+
+	void ResizeOutputSizeOfSource();
 
 public slots:
 	void on_actionResetTransform_triggered();

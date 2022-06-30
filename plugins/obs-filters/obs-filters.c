@@ -1,4 +1,5 @@
 #include <obs-module.h>
+#include "obs-filters-config.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-filters", "en-US")
@@ -24,7 +25,7 @@ extern struct obs_source_info sharpness_filter_v2;
 extern struct obs_source_info chroma_key_filter;
 extern struct obs_source_info chroma_key_filter_v2;
 extern struct obs_source_info async_delay_filter;
-#if defined(HAS_NOISEREDUCTION)
+#if NOISEREDUCTION_ENABLED
 extern struct obs_source_info noise_suppress_filter;
 extern struct obs_source_info noise_suppress_filter_v2;
 extern bool load_nvafx(void);
@@ -57,7 +58,7 @@ bool obs_module_load(void)
 	obs_register_source(&chroma_key_filter);
 	obs_register_source(&chroma_key_filter_v2);
 	obs_register_source(&async_delay_filter);
-#if defined(HAS_NOISEREDUCTION)
+#if NOISEREDUCTION_ENABLED
 #ifdef LIBNVAFX_ENABLED
 	/* load nvidia audio fx dll */
 	load_nvafx();

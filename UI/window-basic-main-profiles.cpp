@@ -305,7 +305,7 @@ bool OBSBasic::CreateProfile(const std::string &newName, bool create_new,
 		return false;
 	}
 
-	if (api && !rename)
+	if (api)
 		api->on_event(OBS_FRONTEND_EVENT_PROFILE_CHANGING);
 
 	config_set_string(App()->GlobalConfig(), "Basic", "Profile",
@@ -350,7 +350,7 @@ bool OBSBasic::CreateProfile(const std::string &newName, bool create_new,
 		wizard.exec();
 	}
 
-	if (api && !rename) {
+	if (api) {
 		api->on_event(OBS_FRONTEND_EVENT_PROFILE_LIST_CHANGED);
 		api->on_event(OBS_FRONTEND_EVENT_PROFILE_CHANGED);
 	}
@@ -517,6 +517,9 @@ void OBSBasic::on_actionDupProfile_triggered()
 
 void OBSBasic::on_actionRenameProfile_triggered()
 {
+	if (api)
+		api->on_event(OBS_FRONTEND_EVENT_PROFILE_CHANGING);
+
 	std::string curDir =
 		config_get_string(App()->GlobalConfig(), "Basic", "ProfileDir");
 	std::string curName =
@@ -531,8 +534,10 @@ void OBSBasic::on_actionRenameProfile_triggered()
 		RefreshProfiles();
 	}
 
-	if (api)
-		api->on_event(OBS_FRONTEND_EVENT_PROFILE_RENAMED);
+	if (api) {
+		api->on_event(OBS_FRONTEND_EVENT_PROFILE_LIST_CHANGED);
+		api->on_event(OBS_FRONTEND_EVENT_PROFILE_CHANGED);
+	}
 }
 
 void OBSBasic::on_actionRemoveProfile_triggered(bool skipConfirmation)
@@ -818,9 +823,6 @@ void OBSBasic::CheckForSimpleModeX264Fallback()
 	bool qsv_supported = false;
 	bool amd_supported = false;
 	bool nve_supported = false;
-#ifdef ENABLE_HEVC
-	bool nve_hevc_supported = false;
-#endif
 	bool changed = false;
 	size_t idx = 0;
 	const char *id;
@@ -832,10 +834,6 @@ void OBSBasic::CheckForSimpleModeX264Fallback()
 			qsv_supported = true;
 		else if (strcmp(id, "ffmpeg_nvenc") == 0)
 			nve_supported = true;
-#ifdef ENABLE_HEVC
-		else if (strcmp(id, "ffmpeg_hevc_nvenc") == 0)
-			nve_hevc_supported = true;
-#endif
 	}
 
 	auto CheckEncoder = [&](const char *&name) {
@@ -851,14 +849,6 @@ void OBSBasic::CheckForSimpleModeX264Fallback()
 				name = SIMPLE_ENCODER_X264;
 				return false;
 			}
-#ifdef ENABLE_HEVC
-		} else if (strcmp(name, SIMPLE_ENCODER_NVENC_HEVC) == 0) {
-			if (!nve_hevc_supported) {
-				changed = true;
-				name = SIMPLE_ENCODER_X264;
-				return false;
-			}
-#endif
 		} else if (strcmp(name, SIMPLE_ENCODER_AMD) == 0) {
 			if (!amd_supported) {
 				changed = true;

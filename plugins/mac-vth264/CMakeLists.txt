@@ -7,24 +7,27 @@ find_library(COREVIDEO CoreVideo)
 find_library(VIDEOTOOLBOX VideoToolbox)
 find_library(COREMEDIA CoreMedia)
 
-mark_as_advanced(AVFOUNDATION COCOA COREFOUNDATION COREVIDEO VIDEOTOOLBOX
-                 COREMEDIA)
+include_directories(${AVFOUNDATION}
+	${COCOA}
+	${COREFOUNDATION}
+	${COREVIDEO}
+	${VIDEOTOOLBOX}
+	${COREMEDIA})
 
-add_library(mac-vth264 MODULE)
-add_library(OBS::vth264 ALIAS mac-vth264)
+set(mac-vth264_SOURCES
+	encoder.c)
 
-target_sources(mac-vth264 PRIVATE encoder.c)
+add_library(mac-vth264 MODULE
+	${mac-vth264_SOURCES})
 
-target_link_libraries(
-  mac-vth264
-  PRIVATE OBS::libobs
-          ${AVFOUNDATION}
-          ${COCOA}
-          ${COREFOUNDATION}
-          ${COREVIDEO}
-          ${VIDEOTOOLBOX}
-          ${COREMEDIA})
+target_link_libraries(mac-vth264
+	libobs
+	${AVFOUNDATION}
+	${COCOA}
+	${COREFOUNDATION}
+	${COREVIDEO}
+	${VIDEOTOOLBOX}
+	${COREMEDIA})
+set_target_properties(mac-vth264 PROPERTIES FOLDER "plugins")
 
-set_target_properties(mac-vth264 PROPERTIES FOLDER "plugins" PREFIX "")
-
-setup_plugin_target(mac-vth264)
+install_obs_plugin_with_data(mac-vth264 data)

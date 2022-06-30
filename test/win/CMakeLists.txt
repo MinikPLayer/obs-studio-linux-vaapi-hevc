@@ -1,11 +1,13 @@
 project(win-test)
 
-add_executable(win-test WIN32)
+include_directories(SYSTEM "${CMAKE_SOURCE_DIR}/libobs")
 
-target_sources(win-test PRIVATE test.cpp)
+set(win-text_SOURCES
+	test.cpp)
 
-target_link_libraries(win-test PRIVATE OBS::libobs)
-
+add_executable(win-test WIN32
+	${win-text_SOURCES})
+target_link_libraries(win-test
+	libobs)
 set_target_properties(win-test PROPERTIES FOLDER "tests and examples")
-
 define_graphic_modules(win-test)

@@ -6,7 +6,6 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <CoreVideo/CoreVideo.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -17,10 +16,11 @@ NS_ASSUME_NONNULL_BEGIN
 /*!
  Will eventually be used for sending frames to all connected clients
  */
-- (void)sendPixelBuffer:(CVPixelBufferRef)frame
-	      timestamp:(uint64_t)timestamp
-	   fpsNumerator:(uint32_t)fpsNumerator
-	 fpsDenominator:(uint32_t)fpsDenominator;
+- (void)sendFrameWithSize:(NSSize)size
+		timestamp:(uint64_t)timestamp
+	     fpsNumerator:(uint32_t)fpsNumerator
+	   fpsDenominator:(uint32_t)fpsDenominator
+	       frameBytes:(uint8_t *)frameBytes;
 
 - (void)stop;
 

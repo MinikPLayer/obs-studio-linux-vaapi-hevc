@@ -349,10 +349,11 @@
 	}
 }
 
-- (void)queuePixelBuffer:(CVPixelBufferRef)frame
-	       timestamp:(uint64_t)timestamp
-	    fpsNumerator:(uint32_t)fpsNumerator
-	  fpsDenominator:(uint32_t)fpsDenominator
+- (void)queueFrameWithSize:(NSSize)size
+		 timestamp:(uint64_t)timestamp
+	      fpsNumerator:(uint32_t)fpsNumerator
+	    fpsDenominator:(uint32_t)fpsDenominator
+		 frameData:(NSData *)frameData
 {
 	if (CMSimpleQueueGetFullness(self.queue) >= 1.0) {
 		DLog(@"Queue is full, bailing out");
@@ -373,37 +374,9 @@
 	self.sequenceNumber = CMIOGetNextSequenceNumber(self.sequenceNumber);
 
 	CMSampleBufferRef sampleBuffer;
-
-	// Generate the video format description from that pixel buffer
-	CMVideoFormatDescriptionRef format;
-	err = CMVideoFormatDescriptionCreateForImageBuffer(kCFAllocatorDefault,
-							   frame, &format);
-	if (err != noErr) {
-		DLog(@"CMVideoFormatDescriptionCreateForImageBuffer err %d",
-		     err);
-		return;
-	}
-
-	err = CMIOSampleBufferCreateForImageBuffer(
-		kCFAllocatorDefault, frame, format, &timingInfo,
-		self.sequenceNumber, kCMIOSampleBufferNoDiscontinuities,
-		&sampleBuffer);
-
-	CFRelease(format);
-
-	if (err != noErr) {
-		DLog(@"CMIOSampleBufferCreateForImageBuffer err %d", err);
-		return;
-	}
-
-	err = CMSimpleQueueEnqueue(self.queue, sampleBuffer);
-
-	if (err != noErr) {
-		CFRelease(sampleBuffer);
-
-		DLog(@"CMSimpleQueueEnqueue err %d", err);
-		return;
-	}
+	CMSampleBufferCreateFromData(size, timingInfo, self.sequenceNumber,
+				     frameData, &sampleBuffer);
+	CMSimpleQueueEnqueue(self.queue, sampleBuffer);
 
 	// Inform the clients that the queue has been altered
 	if (self.alteredProc != NULL) {
@@ -416,8 +389,7 @@
 {
 	CMVideoFormatDescriptionRef formatDescription;
 	OSStatus err = CMVideoFormatDescriptionCreate(
-		kCFAllocatorDefault,
-		kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+		kCFAllocatorDefault, kCMVideoCodecType_422YpCbCr8,
 		self.testCardSize.width, self.testCardSize.height, NULL,
 		&formatDescription);
 	if (err != noErr) {
@@ -579,14 +551,7 @@
 
 - (BOOL)isPropertySettableWithAddress:(CMIOObjectPropertyAddress)address
 {
-	switch (address.mSelector) {
-	case kCMIOStreamPropertyFormatDescription:
-	case kCMIOStreamPropertyFrameRate:
-		// Suppress error logs complaining about the application not being able to set the desired format or frame rate.
-		return true;
-	default:
-		return false;
-	}
+	return false;
 }
 
 - (void)setPropertyDataWithAddress:(CMIOObjectPropertyAddress)address

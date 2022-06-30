@@ -4,7 +4,6 @@
 
 MediaSlider::MediaSlider(QWidget *parent) : SliderIgnoreScroll(parent)
 {
-	installEventFilter(this);
 	setMouseTracking(true);
 
 	QString styleName = style()->objectName();
@@ -32,21 +31,4 @@ void MediaSlider::mouseMoveEvent(QMouseEvent *event)
 	emit mediaSliderHovered(val);
 	event->accept();
 	QSlider::mouseMoveEvent(event);
-}
-
-bool MediaSlider::eventFilter(QObject *obj, QEvent *event)
-{
-	if (event->type() == QEvent::KeyPress) {
-		QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
-
-		if (keyEvent->key() == Qt::Key_Up ||
-		    keyEvent->key() == Qt::Key_Down) {
-			return true;
-		}
-	}
-
-	if (event->type() == QEvent::Wheel)
-		return true;
-
-	return QSlider::eventFilter(obj, event);
 }

@@ -142,14 +142,14 @@ void DeckLinkDeviceInstance::HandleVideoFrame(
 	if (videoFrame == nullptr)
 		return;
 
-	ComPtr<IDeckLinkVideoFrameAncillaryPackets> packets;
+	IDeckLinkVideoFrameAncillaryPackets *packets;
 
 	if (videoFrame->QueryInterface(IID_IDeckLinkVideoFrameAncillaryPackets,
 				       (void **)&packets) == S_OK) {
-		ComPtr<IDeckLinkAncillaryPacketIterator> iterator;
+		IDeckLinkAncillaryPacketIterator *iterator;
 		packets->GetPacketIterator(&iterator);
 
-		ComPtr<IDeckLinkAncillaryPacket> packet;
+		IDeckLinkAncillaryPacket *packet;
 		iterator->Next(&packet);
 
 		if (packet) {
@@ -160,13 +160,18 @@ void DeckLinkDeviceInstance::HandleVideoFrame(
 			if (did == 0x61 && sdid == 0x01) {
 				this->HandleCaptionPacket(packet, timestamp);
 			}
+
+			packet->Release();
 		}
+
+		iterator->Release();
+		packets->Release();
 	}
 
-	ComPtr<IDeckLinkVideoFrame> frame;
+	IDeckLinkVideoFrame *frame;
 	if (videoFrame->GetPixelFormat() != convertFrame->GetPixelFormat()) {
-		ComPtr<IDeckLinkVideoConversion> frameConverter;
-		frameConverter.Set(CreateVideoConversionInstance());
+		IDeckLinkVideoConversion *frameConverter =
+			CreateVideoConversionInstance();
 
 		frameConverter->ConvertFrame(videoFrame, convertFrame);
 
@@ -186,9 +191,6 @@ void DeckLinkDeviceInstance::HandleVideoFrame(
 	currentFrame.width = (uint32_t)frame->GetWidth();
 	currentFrame.height = (uint32_t)frame->GetHeight();
 	currentFrame.timestamp = timestamp;
-
-	if (currentFrame.width == 0 || currentFrame.height == 0)
-		return;
 
 	obs_source_output_video2(
 		static_cast<DeckLinkInput *>(decklink)->GetSource(),
@@ -308,8 +310,7 @@ void DeckLinkDeviceInstance::SetupVideoFormat(DeckLinkDeviceMode *mode_)
 	if (mode_ == nullptr)
 		return;
 
-	const enum video_format format = ConvertPixelFormat(pixelFormat);
-	currentFrame.format = format;
+	currentFrame.format = ConvertPixelFormat(pixelFormat);
 
 	colorSpace = static_cast<DeckLinkInput *>(decklink)->GetColorSpace();
 	if (colorSpace == VIDEO_CS_DEFAULT) {
@@ -327,9 +328,10 @@ void DeckLinkDeviceInstance::SetupVideoFormat(DeckLinkDeviceMode *mode_)
 	colorRange = static_cast<DeckLinkInput *>(decklink)->GetColorRange();
 	currentFrame.range = colorRange;
 
-	video_format_get_parameters_for_format(
-		activeColorSpace, colorRange, format, currentFrame.color_matrix,
-		currentFrame.color_range_min, currentFrame.color_range_max);
+	video_format_get_parameters(activeColorSpace, colorRange,
+				    currentFrame.color_matrix,
+				    currentFrame.color_range_min,
+				    currentFrame.color_range_max);
 
 	delete convertFrame;
 
@@ -371,7 +373,7 @@ bool DeckLinkDeviceInstance::StartCapture(DeckLinkDeviceMode *mode_,
 	if (!device->GetInput(&input))
 		return false;
 
-	ComPtr<IDeckLinkConfiguration> deckLinkConfiguration;
+	IDeckLinkConfiguration *deckLinkConfiguration = NULL;
 	HRESULT result = input->QueryInterface(IID_IDeckLinkConfiguration,
 					       (void **)&deckLinkConfiguration);
 	if (result != S_OK) {
@@ -524,7 +526,7 @@ bool DeckLinkDeviceInstance::StartOutput(DeckLinkDeviceMode *mode_)
 
 	int keyerMode = device->GetKeyerMode();
 
-	ComPtr<IDeckLinkKeyer> deckLinkKeyer;
+	IDeckLinkKeyer *deckLinkKeyer = nullptr;
 	if (device->GetKeyer(&deckLinkKeyer)) {
 		if (keyerMode) {
 			deckLinkKeyer->Enable(keyerMode == 1);
@@ -572,8 +574,10 @@ bool DeckLinkDeviceInstance::StopOutput()
 	output->DisableVideoOutput();
 	output->DisableAudioOutput();
 
-	if (decklinkOutputFrame != nullptr)
+	if (decklinkOutputFrame != nullptr) {
+		decklinkOutputFrame->Release();
 		decklinkOutputFrame = nullptr;
+	}
 
 	return true;
 }

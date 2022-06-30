@@ -29,20 +29,9 @@ if(XKBCOMMON_FOUND)
   set(XKBCOMMON_LIBRARIES ${XKBCOMMON_LIB})
 
   if(NOT TARGET Xkbcommon::Xkbcommon)
-    if(IS_ABSOLUTE "${XKBCOMMON_LIBRARIES}")
-      add_library(Xkbcommon::Xkbcommon UNKNOWN IMPORTED)
-      set_target_properties(
-        Xkbcommon::Xkbcommon PROPERTIES IMPORTED_LOCATION
-                                        "${XKBCOMMON_LIBRARIES}")
-    else()
-      add_library(Xkbcommon::Xkbcommon INTERFACE IMPORTED)
-      set_target_properties(
-        Xkbcommon::Xkbcommon PROPERTIES IMPORTED_LIBNAME
-                                        "${XKBCOMMON_LIBRARIES}")
-    endif()
-
+    add_library(Xkbcommon::Xkbcommon INTERFACE IMPORTED)
     set_target_properties(
       Xkbcommon::Xkbcommon PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
-                                      "${XKBCOMMON_INCLUDE_DIRS}")
+                                "${XKBCOMMON_INCLUDE_DIRS}")
   endif()
 endif()

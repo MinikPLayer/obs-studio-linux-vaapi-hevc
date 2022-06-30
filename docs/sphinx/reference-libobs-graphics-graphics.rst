@@ -47,15 +47,6 @@ Graphics Enumerations
    - GS_BGRA_UNORM  - BGRA, 8 bits per channel, no SRGB aliasing
    - GS_RG16        - RG, 16 bits per channel
 
-.. type:: enum gs_color_space
-
-   Color space.  Can be one of the following values:
-
-   - GS_CS_SRGB         - sRGB
-   - GS_CS_SRGB_16F     - High-precision SDR
-   - GS_CS_709_EXTENDED - Canvas, Mac EDR (HDR)
-   - GS_CS_709_SCRGB    - 1.0 = 80 nits, Windows/Linux HDR
-
 .. type:: enum gs_zstencil_format
 
    Z-Stencil buffer format.  Can be one of the following values:
@@ -238,7 +229,7 @@ Graphics Structures
 
 .. member:: id  gs_window.view
 
-   (macOS only) A view ID.
+   (Mac only) A view ID.
 
 .. member:: uint32_t gs_window.id
             void* gs_window.display
@@ -267,7 +258,7 @@ Initialization Functions
 
 .. function:: void gs_enum_adapters(bool (*callback)(void *param, const char *name, uint32_t id), void *param)
 
-   Enumerates adapters (this really only applies on Windows).
+   Enumerates adapters (this really only applies on windows).
 
    :param callback: Enumeration callback
    :param param:    Private data passed to the callback
@@ -551,13 +542,6 @@ Swap Chains
 
 ---------------------
 
-.. function:: void gs_update_color_space(void)
-
-   Updates the color space of the swap chain based on the HDR status of
-   the nearest monitor
-
----------------------
-
 .. function:: void gs_get_size(uint32_t *cx, uint32_t *cy)
 
    Gets the size of the currently active swap chain
@@ -629,12 +613,6 @@ Resource Loading
 Draw Functions
 --------------
 
-.. function:: enum gs_color_space gs_get_color_space(void)
-
-   :return: The currently active color space
-
----------------------
-
 .. function:: gs_texture_t  *gs_get_render_target(void)
 
    :return: The currently active render target
@@ -649,20 +627,10 @@ Draw Functions
 
 .. function:: void gs_set_render_target(gs_texture_t *tex, gs_zstencil_t *zstencil)
 
-   Sets the active render target with implicit GS_CS_SRGB color space
+   Sets the active render target
 
    :param tex:      Texture to set as the active render target
    :param zstencil: Z-stencil to use as the active render target
-
----------------------
-
-.. function:: void gs_set_render_target_with_color_space(gs_texture_t *tex, gs_zstencil_t *zstencil, enum gs_color_space space)
-
-   Sets the active render target along with color space
-
-   :param tex:      Texture to set as the active render target
-   :param zstencil: Z-stencil to use as the active render target
-   :param space:    Color space of the render target
 
 ---------------------
 
@@ -1084,7 +1052,7 @@ Texture Functions
 
 .. function:: gs_texture_t *gs_texture_create_from_iosurface(void *iosurf)
 
-   **macOS only:** Creates a texture from an IOSurface.
+   **Mac only:** Creates a texture from an IOSurface.
 
    :param iosurf: IOSurface object
 
@@ -1092,7 +1060,7 @@ Texture Functions
 
 .. function:: bool     gs_texture_rebind_iosurface(gs_texture_t *texture, void *iosurf)
 
-   **macOS only:** Rebinds a texture to another IOSurface
+   **Mac only:** Rebinds a texture to another IOSurface
 
    :param texture: Texture object
    :param iosuf:   IOSurface object
@@ -1503,14 +1471,6 @@ Display Duplicator (Windows Only)
 ---------------------
 
 .. function:: bool gs_get_duplicator_monitor_info(int monitor_idx, struct gs_monitor_info *monitor_info)
-
----------------------
-
-
-Monitor Functions
----------------------------------
-
-.. function:: bool gs_is_monitor_hdr(void *monitor)
 
 ---------------------
 

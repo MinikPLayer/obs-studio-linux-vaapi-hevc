@@ -5,7 +5,7 @@
 
 DeckLinkDeviceDiscovery::DeckLinkDeviceDiscovery()
 {
-	discovery.Set(CreateDeckLinkDiscoveryInstance());
+	discovery = CreateDeckLinkDiscoveryInstance();
 	if (discovery == nullptr)
 		blog(LOG_INFO, "No blackmagic support");
 }

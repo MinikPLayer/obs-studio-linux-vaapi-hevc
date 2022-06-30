@@ -660,14 +660,16 @@ static bool parse_sample(struct vt_h264_encoder *enc, CMSampleBufferRef buffer,
 	CMTime pts = CMSampleBufferGetPresentationTimeStamp(buffer);
 	CMTime dts = CMSampleBufferGetDecodeTimeStamp(buffer);
 
+	pts = CMTimeMultiplyByFloat64(pts,
+				      ((Float64)enc->fps_num / enc->fps_den));
+	dts = CMTimeMultiplyByFloat64(dts,
+				      ((Float64)enc->fps_num / enc->fps_den));
+
 	if (CMTIME_IS_INVALID(dts))
 		dts = pts;
 	// imitate x264's negative dts when bframes might have pts < dts
 	else if (enc->bframes)
 		dts = CMTimeSubtract(dts, off);
-
-	pts = CMTimeMultiply(pts, enc->fps_num);
-	dts = CMTimeMultiply(dts, enc->fps_num);
 
 	bool keyframe = is_sample_keyframe(buffer);
 
@@ -770,7 +772,7 @@ static bool vt_h264_encode(void *data, struct encoder_frame *frame,
 
 	CMTime dur = CMTimeMake(enc->fps_den, enc->fps_num);
 	CMTime off = CMTimeMultiply(dur, 2);
-	CMTime pts = CMTimeMake(frame->pts, enc->fps_num);
+	CMTime pts = CMTimeMultiply(dur, frame->pts);
 
 	CVPixelBufferRef pixbuf = NULL;
 
@@ -830,8 +832,7 @@ static bool vt_h264_extra_data(void *data, uint8_t **extra_data, size_t *size)
 
 static const char *vt_h264_getname(void *data)
 {
-	uintptr_t encoder_id = (uintptr_t)data;
-	const char *disp_name = vt_encoders.array[(int)encoder_id].disp_name;
+	const char *disp_name = vt_encoders.array[(int)data].disp_name;
 
 	if (strcmp("Apple H.264 (HW)", disp_name) == 0) {
 		return obs_module_text("VTH264EncHW");

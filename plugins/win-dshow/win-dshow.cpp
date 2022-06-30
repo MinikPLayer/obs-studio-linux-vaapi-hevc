@@ -47,7 +47,6 @@ using namespace DShow;
 #define COLOR_RANGE       "color_range"
 #define DEACTIVATE_WNS    "deactivate_when_not_showing"
 #define AUTOROTATION      "autorotation"
-#define HW_DECODE         "hw_decode"
 
 #define TEXT_INPUT_NAME     obs_module_text("VideoCaptureDevice")
 #define TEXT_DEVICE         obs_module_text("Device")
@@ -67,7 +66,6 @@ using namespace DShow;
 #define TEXT_BUFFERING_OFF  obs_module_text("Buffering.Disable")
 #define TEXT_FLIP_IMAGE     obs_module_text("FlipVertically")
 #define TEXT_AUTOROTATION   obs_module_text("Autorotation")
-#define TEXT_HW_DECODE      obs_module_text("HardwareDecode")
 #define TEXT_AUDIO_MODE     obs_module_text("AudioOutputMode")
 #define TEXT_MODE_CAPTURE   obs_module_text("AudioOutputMode.Capture")
 #define TEXT_MODE_DSOUND    obs_module_text("AudioOutputMode.DirectSound")
@@ -78,10 +76,6 @@ using namespace DShow;
 #define TEXT_DEACTIVATE     obs_module_text("Deactivate")
 #define TEXT_COLOR_SPACE    obs_module_text("ColorSpace")
 #define TEXT_COLOR_DEFAULT  obs_module_text("ColorSpace.Default")
-#define TEXT_COLOR_709      obs_module_text("ColorSpace.709")
-#define TEXT_COLOR_601      obs_module_text("ColorSpace.601")
-#define TEXT_COLOR_2100PQ   obs_module_text("ColorSpace.2100PQ")
-#define TEXT_COLOR_2100HLG  obs_module_text("ColorSpace.2100HLG")
 #define TEXT_COLOR_RANGE    obs_module_text("ColorRange")
 #define TEXT_RANGE_DEFAULT  obs_module_text("ColorRange.Default")
 #define TEXT_RANGE_PARTIAL  obs_module_text("ColorRange.Partial")
@@ -177,7 +171,6 @@ enum class Action {
 	ConfigAudio,
 	ConfigCrossbar1,
 	ConfigCrossbar2,
-	SaveSettings,
 };
 
 static DWORD CALLBACK DShowThread(LPVOID ptr);
@@ -191,7 +184,6 @@ struct DShowInput {
 	bool flip = false;
 	bool active = false;
 	bool autorotation = true;
-	bool hw_decode = false;
 
 	Decoder audio_decoder;
 	Decoder video_decoder;
@@ -199,13 +191,13 @@ struct DShowInput {
 	VideoConfig videoConfig;
 	AudioConfig audioConfig;
 
+	video_range_type range;
 	obs_source_frame2 frame;
 	obs_source_audio audio;
 	long lastRotation = 0;
 
 	WinHandle semaphore;
 	WinHandle activated_event;
-	WinHandle saved_event;
 	WinHandle thread;
 	CriticalSection mutex;
 	vector<Action> actions;
@@ -245,10 +237,6 @@ struct DShowInput {
 		if (!activated_event)
 			throw "Failed to create activated_event";
 
-		saved_event = CreateEvent(nullptr, false, false, nullptr);
-		if (!saved_event)
-			throw "Failed to create saved_event";
-
 		thread =
 			CreateThread(nullptr, 0, DShowThread, this, 0, nullptr);
 		if (!thread)
@@ -284,7 +272,6 @@ struct DShowInput {
 	void OnEncodedAudioData(enum AVCodecID id, unsigned char *data,
 				size_t size, long long ts);
 
-	void OnReactivate();
 	void OnVideoData(const VideoConfig &config, unsigned char *data,
 			 size_t size, long long startTime, long long endTime,
 			 long rotation);
@@ -293,8 +280,6 @@ struct DShowInput {
 
 	bool UpdateVideoConfig(obs_data_t *settings);
 	bool UpdateAudioConfig(obs_data_t *settings);
-	bool UpdateVideoProperties(obs_data_t *settings);
-	void SaveVideoProperties();
 	void SetActive(bool active);
 	inline enum video_colorspace GetColorSpace(obs_data_t *settings) const;
 	inline enum video_range_type GetColorRange(obs_data_t *settings) const;
@@ -389,9 +374,6 @@ void DShowInput::DShowLoop()
 			device.OpenDialog(nullptr, DialogType::ConfigCrossbar2);
 			break;
 
-		case Action::SaveSettings:
-			SaveVideoProperties();
-			break;
 		case Action::None:;
 		}
 	}
@@ -452,8 +434,6 @@ static inline video_format ConvertVideoFormat(VideoFormat format)
 		return VIDEO_FORMAT_UYVY;
 	case VideoFormat::HDYC:
 		return VIDEO_FORMAT_UYVY;
-	case VideoFormat::P010:
-		return VIDEO_FORMAT_P010;
 	default:
 		return VIDEO_FORMAT_NONE;
 	}
@@ -498,18 +478,25 @@ static inline enum speaker_layout convert_speaker_layout(uint8_t channels)
 //#define LOG_ENCODED_VIDEO_TS 1
 //#define LOG_ENCODED_AUDIO_TS 1
 
+#define MAX_SW_RES_INT (1920 * 1080)
+
 void DShowInput::OnEncodedVideoData(enum AVCodecID id, unsigned char *data,
 				    size_t size, long long ts)
 {
-	/* If format or hw decode changes, recreate the decoder */
+	/* If format changes, free and allow it to recreate the decoder */
 	if (ffmpeg_decode_valid(video_decoder) &&
-	    ((video_decoder->codec->id != id) ||
-	     (video_decoder->hw != hw_decode))) {
+	    video_decoder->codec->id != id) {
 		ffmpeg_decode_free(video_decoder);
 	}
 
 	if (!ffmpeg_decode_valid(video_decoder)) {
-		if (ffmpeg_decode_init(video_decoder, id, hw_decode) < 0) {
+		/* Only use MJPEG hardware decoding on resolutions higher
+		 * than 1920x1080.  The reason why is because we want to strike
+		 * a reasonable balance between hardware and CPU usage. */
+		bool useHW = videoConfig.format != VideoFormat::MJPEG ||
+			     (videoConfig.cx * videoConfig.cy_abs) >
+				     MAX_SW_RES_INT;
+		if (ffmpeg_decode_init(video_decoder, id, useHW) < 0) {
 			blog(LOG_WARNING, "Could not initialize video decoder");
 			return;
 		}
@@ -517,7 +504,7 @@ void DShowInput::OnEncodedVideoData(enum AVCodecID id, unsigned char *data,
 
 	bool got_output;
 	bool success = ffmpeg_decode_video(video_decoder, data, size, &ts,
-					   frame.range, &frame, &got_output);
+					   range, &frame, &got_output);
 	if (!success) {
 		blog(LOG_WARNING, "Error decoding video");
 		return;
@@ -534,11 +521,6 @@ void DShowInput::OnEncodedVideoData(enum AVCodecID id, unsigned char *data,
 	}
 }
 
-void DShowInput::OnReactivate()
-{
-	SetActive(true);
-}
-
 void DShowInput::OnVideoData(const VideoConfig &config, unsigned char *data,
 			     size_t size, long long startTime,
 			     long long endTime, long rotation)
@@ -552,13 +534,6 @@ void DShowInput::OnVideoData(const VideoConfig &config, unsigned char *data,
 		OnEncodedVideoData(AV_CODEC_ID_H264, data, size, startTime);
 		return;
 	}
-
-#ifdef ENABLE_HEVC
-	if (videoConfig.format == VideoFormat::HEVC) {
-		OnEncodedVideoData(AV_CODEC_ID_HEVC, data, size, startTime);
-		return;
-	}
-#endif
 
 	if (videoConfig.format == VideoFormat::MJPEG) {
 		OnEncodedVideoData(AV_CODEC_ID_MJPEG, data, size, startTime);
@@ -621,12 +596,6 @@ void DShowInput::OnVideoData(const VideoConfig &config, unsigned char *data,
 		frame.data[0] = data;
 		frame.linesize[0] = cx;
 
-	} else if (videoConfig.format == VideoFormat::P010) {
-		frame.data[0] = data;
-		frame.data[1] = frame.data[0] + (cx * cy_abs) * 2;
-		frame.linesize[0] = cx * 2;
-		frame.linesize[1] = cx * 2;
-
 	} else {
 		/* TODO: other formats */
 		return;
@@ -635,6 +604,7 @@ void DShowInput::OnVideoData(const VideoConfig &config, unsigned char *data,
 	obs_source_output_video2(source, &frame);
 
 	UNUSED_PARAMETER(endTime); /* it's the enndd tiimmes! */
+	UNUSED_PARAMETER(size);
 }
 
 void DShowInput::OnEncodedAudioData(enum AVCodecID id, unsigned char *data,
@@ -904,7 +874,6 @@ bool DShowInput::UpdateVideoConfig(obs_data_t *settings)
 	deactivateWhenNotShowing = obs_data_get_bool(settings, DEACTIVATE_WNS);
 	flip = obs_data_get_bool(settings, FLIP_IMAGE);
 	autorotation = obs_data_get_bool(settings, AUTOROTATION);
-	hw_decode = obs_data_get_bool(settings, HW_DECODE);
 
 	DeviceId id;
 	if (!DecodeDeviceId(id, video_device_id.c_str())) {
@@ -981,8 +950,6 @@ bool DShowInput::UpdateVideoConfig(obs_data_t *settings)
 					 placeholders::_1, placeholders::_2,
 					 placeholders::_3, placeholders::_4,
 					 placeholders::_5, placeholders::_6);
-	videoConfig.reactivateCallback =
-		std::bind(&DShowInput::OnReactivate, this);
 
 	videoConfig.format = videoConfig.internalFormat;
 
@@ -1017,112 +984,14 @@ bool DShowInput::UpdateVideoConfig(obs_data_t *settings)
 	     "\tflip: %d\n"
 	     "\tfps: %0.2f (interval: %lld)\n"
 	     "\tformat: %s\n"
-	     "\tbuffering: %s\n"
-	     "\thardware decode: %s",
+	     "\tbuffering: %s",
 	     obs_source_get_name(source), (const char *)name_utf8,
 	     (const char *)path_utf8, videoConfig.cx, videoConfig.cy_abs,
 	     (int)videoConfig.cy_flip, fps, videoConfig.frameInterval,
 	     formatName->array,
-	     obs_source_async_unbuffered(source) ? "disabled" : "enabled",
-	     hw_decode ? "enabled" : "disabled");
+	     obs_source_async_unbuffered(source) ? "disabled" : "enabled");
 
 	return true;
-}
-
-bool DShowInput::UpdateVideoProperties(obs_data_t *settings)
-{
-	OBSDataArrayAutoRelease cca =
-		obs_data_get_array(settings, "CameraControl");
-
-	if (cca) {
-		std::vector<VideoDeviceProperty> properties;
-		const auto count = obs_data_array_count(cca);
-
-		for (size_t i = 0; i < count; i++) {
-			OBSDataAutoRelease item = obs_data_array_item(cca, i);
-			if (!item)
-				continue;
-
-			VideoDeviceProperty prop{};
-			prop.property =
-				(long)obs_data_get_int(item, "property");
-			prop.flags = (long)obs_data_get_int(item, "flags");
-			prop.val = (long)obs_data_get_int(item, "val");
-			properties.push_back(prop);
-		}
-
-		if (!properties.empty()) {
-			device.SetCameraControlProperties(&properties);
-		}
-	}
-
-	OBSDataArrayAutoRelease vpaa =
-		obs_data_get_array(settings, "VideoProcAmp");
-
-	if (vpaa) {
-		std::vector<VideoDeviceProperty> properties;
-		const auto count = obs_data_array_count(vpaa);
-
-		for (size_t i = 0; i < count; i++) {
-			OBSDataAutoRelease item = obs_data_array_item(vpaa, i);
-			if (!item)
-				continue;
-
-			VideoDeviceProperty prop{};
-			prop.property =
-				(long)obs_data_get_int(item, "property");
-			prop.flags = (long)obs_data_get_int(item, "flags");
-			prop.val = (long)obs_data_get_int(item, "val");
-			properties.push_back(prop);
-		}
-
-		if (!properties.empty()) {
-			device.SetVideoProcAmpProperties(&properties);
-		}
-	}
-
-	return true;
-}
-
-void DShowInput::SaveVideoProperties()
-{
-	OBSDataAutoRelease settings = obs_source_get_settings(source);
-	if (!settings) {
-		SetEvent(saved_event);
-		return;
-	}
-
-	std::vector<VideoDeviceProperty> properties;
-	OBSDataArrayAutoRelease ccp = obs_data_array_create();
-
-	if (device.GetCameraControlProperties(properties)) {
-		for (const auto property : properties) {
-			OBSDataAutoRelease obj = obs_data_create();
-			obs_data_set_int(obj, "property", property.property);
-			obs_data_set_int(obj, "flags", property.flags);
-			obs_data_set_int(obj, "val", property.val);
-			obs_data_array_push_back(ccp, obj);
-		}
-	}
-
-	obs_data_set_array(settings, "CameraControl", ccp);
-	properties.clear();
-
-	OBSDataArrayAutoRelease vpap = obs_data_array_create();
-
-	if (device.GetVideoProcAmpProperties(properties)) {
-		for (const auto property : properties) {
-			OBSDataAutoRelease obj = obs_data_create();
-			obs_data_set_int(obj, "property", property.property);
-			obs_data_set_int(obj, "flags", property.flags);
-			obs_data_set_int(obj, "val", property.val);
-			obs_data_array_push_back(vpap, obj);
-		}
-	}
-
-	obs_data_set_array(settings, "VideoProcAmp", vpap);
-
-	SetEvent(saved_event);
 }
 
 bool DShowInput::UpdateAudioConfig(obs_data_t *settings)
@@ -1215,15 +1084,6 @@ DShowInput::GetColorSpace(obs_data_t *settings) const
 	if (astrcmpi(space, "601") == 0)
 		return VIDEO_CS_601;
 
-	if (astrcmpi(space, "2100PQ") == 0)
-		return VIDEO_CS_2100_PQ;
-
-	if (astrcmpi(space, "2100HLG") == 0)
-		return VIDEO_CS_2100_HLG;
-
-	if (videoConfig.format == VideoFormat::P010)
-		return VIDEO_CS_2100_PQ;
-
 	return VIDEO_CS_DEFAULT;
 }
 
@@ -1262,36 +1122,14 @@ inline bool DShowInput::Activate(obs_data_t *settings)
 	if (device.Start() != Result::Success)
 		return false;
 
-	if (!UpdateVideoProperties(settings)) {
-		blog(LOG_WARNING, "%s: Setting video device properties failed",
-		     obs_source_get_name(source));
-	}
-
-	const enum video_colorspace cs = GetColorSpace(settings);
-	const enum video_range_type range = GetColorRange(settings);
-
-	enum video_trc trc = VIDEO_TRC_DEFAULT;
-	switch (cs) {
-	case VIDEO_CS_DEFAULT:
-	case VIDEO_CS_601:
-	case VIDEO_CS_709:
-	case VIDEO_CS_SRGB:
-		trc = VIDEO_TRC_SRGB;
-		break;
-	case VIDEO_CS_2100_PQ:
-		trc = VIDEO_TRC_PQ;
-		break;
-	case VIDEO_CS_2100_HLG:
-		trc = VIDEO_TRC_HLG;
-	}
-
+	enum video_colorspace cs = GetColorSpace(settings);
+	range = GetColorRange(settings);
 	frame.range = range;
-	frame.trc = trc;
 
-	bool success = video_format_get_parameters_for_format(
-		cs, range, ConvertVideoFormat(videoConfig.format),
-		frame.color_matrix, frame.color_range_min,
-		frame.color_range_max);
+	bool success = video_format_get_parameters(cs, range,
+						   frame.color_matrix,
+						   frame.color_range_min,
+						   frame.color_range_max);
 	if (!success) {
 		blog(LOG_ERROR,
 		     "Failed to get video format parameters for "
@@ -1351,16 +1189,6 @@ static void UpdateDShowInput(void *data, obs_data_t *settings)
 		input->QueueActivate(settings);
 }
 
-static void SaveDShowInput(void *data, obs_data_t *settings)
-{
-	DShowInput *input = reinterpret_cast<DShowInput *>(data);
-	if (!input->active)
-		return;
-
-	input->QueueAction(Action::SaveSettings);
-	WaitForSingleObject(input->saved_event, INFINITE);
-}
-
 static void GetDShowDefaults(obs_data_t *settings)
 {
 	obs_data_set_default_int(settings, FRAME_INTERVAL, FPS_MATCHING);
@@ -1372,7 +1200,6 @@ static void GetDShowDefaults(obs_data_t *settings)
 	obs_data_set_default_int(settings, AUDIO_OUTPUT_MODE,
 				 (int)AudioMode::Capture);
 	obs_data_set_default_bool(settings, AUTOROTATION, true);
-	obs_data_set_default_bool(settings, HW_DECODE, false);
 }
 
 struct Resolution {
@@ -1521,7 +1348,6 @@ static const VideoFormatName videoFormatNames[] = {
 	{VideoFormat::NV12, "NV12"},
 	{VideoFormat::YV12, "YV12"},
 	{VideoFormat::Y800, "Y800"},
-	{VideoFormat::P010, "P010"},
 
 	/* packed YUV formats */
 	{VideoFormat::YVYU, "YVYU"},
@@ -1531,11 +1357,7 @@ static const VideoFormatName videoFormatNames[] = {
 
 	/* encoded formats */
 	{VideoFormat::MJPEG, "MJPEG"},
-	{VideoFormat::H264, "H264"},
-#ifdef ENABLE_HEVC
-	{VideoFormat::HEVC, "HEVC"},
-#endif
-};
+	{VideoFormat::H264, "H264"}};
 
 static bool ResTypeChanged(obs_properties_t *props, obs_property_t *p,
 			   obs_data_t *settings);
@@ -2103,10 +1925,8 @@ static obs_properties_t *GetDShowProperties(void *obj)
 				    OBS_COMBO_TYPE_LIST,
 				    OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, TEXT_COLOR_DEFAULT, "default");
-	obs_property_list_add_string(p, TEXT_COLOR_709, "709");
-	obs_property_list_add_string(p, TEXT_COLOR_601, "601");
-	obs_property_list_add_string(p, TEXT_COLOR_2100PQ, "2100PQ");
-	obs_property_list_add_string(p, TEXT_COLOR_2100HLG, "2100HLG");
+	obs_property_list_add_string(p, "709", "709");
+	obs_property_list_add_string(p, "601", "601");
 
 	p = obs_properties_add_list(ppts, COLOR_RANGE, TEXT_COLOR_RANGE,
 				    OBS_COMBO_TYPE_LIST,
@@ -2130,8 +1950,6 @@ static obs_properties_t *GetDShowProperties(void *obj)
 	obs_properties_add_bool(ppts, FLIP_IMAGE, TEXT_FLIP_IMAGE);
 
 	obs_properties_add_bool(ppts, AUTOROTATION, TEXT_AUTOROTATION);
-
-	obs_properties_add_bool(ppts, HW_DECODE, TEXT_HW_DECODE);
 
 	/* ------------------------------------- */
 	/* audio settings */
@@ -2224,7 +2042,6 @@ void RegisterDShowSource()
 	info.update = UpdateDShowInput;
 	info.get_defaults = GetDShowDefaults;
 	info.get_properties = GetDShowProperties;
-	info.save = SaveDShowInput;
 	info.icon_type = OBS_ICON_TYPE_CAMERA;
 	obs_register_source(&info);
 }

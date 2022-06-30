@@ -967,17 +967,28 @@ void SourceTreeModel::GroupSelectedItems(QModelIndexList &indices)
 	for (obs_sceneitem_t *item : item_order)
 		obs_sceneitem_select(item, false);
 
+	int newIdx = indices[0].row();
+
+	beginInsertRows(QModelIndex(), newIdx, newIdx);
+	items.insert(newIdx, item);
+	endInsertRows();
+
+	for (int i = 0; i < indices.size(); i++) {
+		int fromIdx = indices[i].row() + 1;
+		int toIdx = newIdx + i + 1;
+		if (fromIdx != toIdx) {
+			beginMoveRows(QModelIndex(), fromIdx, fromIdx,
+				      QModelIndex(), toIdx);
+			MoveItem(items, fromIdx, toIdx);
+			endMoveRows();
+		}
+	}
+
 	hasGroups = true;
 	st->UpdateWidgets(true);
 
 	obs_sceneitem_select(item, true);
 
-	/* ----------------------------------------------------------------- */
-	/* obs_scene_insert_group triggers a full refresh of scene items via */
-	/* the item_add signal. No need to insert a row, just edit the one   */
-	/* that's created automatically.                                     */
-
-	int newIdx = indices[0].row();
 	QMetaObject::invokeMethod(st, "NewGroupEdit", Qt::QueuedConnection,
 				  Q_ARG(int, newIdx));
 }
@@ -1694,8 +1705,10 @@ void SourceTree::UpdateNoSourcesMessage()
 	std::string darkPath;
 	GetDataFilePath("themes/Dark/no_sources.svg", darkPath);
 
-	QString file = !App()->IsThemeDark() ? ":res/images/no_sources.svg"
-					     : darkPath.c_str();
+	QColor color = palette().text().color();
+	bool lightTheme = (color.redF() < 0.5);
+	QString file = lightTheme ? ":res/images/no_sources.svg"
+				  : darkPath.c_str();
 	iconNoSources.load(file);
 
 	QTextOption opt(Qt::AlignHCenter);

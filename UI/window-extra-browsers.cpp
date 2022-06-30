@@ -179,6 +179,7 @@ void ExtraBrowsersModel::UpdateItem(Item &item)
 		main->extraBrowserDocks[idx].data());
 	dock->setWindowTitle(item.title);
 	dock->setObjectName(item.title + OBJ_NAME_SUFFIX);
+	dock->setProperty("uuid", item.uuid);
 	main->extraBrowserDockActions[idx]->setText(item.title);
 
 	if (main->extraBrowserDockTargets[idx] != item.url) {
@@ -225,10 +226,8 @@ void ExtraBrowsersModel::Apply()
 		if (item.prevIdx != -1) {
 			UpdateItem(item);
 		} else {
-			QString uuid = QUuid::createUuid().toString();
-			uuid.replace(QRegularExpression("[{}-]"), "");
-			main->AddExtraBrowserDock(item.title, item.url, uuid,
-						  true);
+			main->AddExtraBrowserDock(item.title, item.url,
+						  item.uuid, true);
 		}
 	}
 
@@ -441,7 +440,10 @@ OBSExtraBrowsers::OBSExtraBrowsers(QWidget *parent)
 		QAbstractItemView::EditTrigger::CurrentChanged);
 }
 
-OBSExtraBrowsers::~OBSExtraBrowsers() {}
+OBSExtraBrowsers::~OBSExtraBrowsers()
+{
+	delete ui;
+}
 
 void OBSExtraBrowsers::closeEvent(QCloseEvent *event)
 {
@@ -491,11 +493,11 @@ void OBSBasic::SaveExtraBrowserDocks()
 {
 	Json::array array;
 	for (int i = 0; i < extraBrowserDocks.size(); i++) {
-		QDockWidget *dock = extraBrowserDocks[i].data();
+		QAction *action = extraBrowserDockActions[i].data();
 		QString url = extraBrowserDockTargets[i];
-		QString uuid = dock->property("uuid").toString();
+		QString uuid = action->property("uuid").toString();
 		Json::object obj{
-			{"title", QT_TO_UTF8(dock->windowTitle())},
+			{"title", QT_TO_UTF8(action->text())},
 			{"url", QT_TO_UTF8(url)},
 			{"uuid", QT_TO_UTF8(uuid)},
 		};

@@ -280,8 +280,6 @@ static void reinsert_packet_at_front(struct rtmp_stream *stream,
 
 static bool process_recv_data(struct rtmp_stream *stream, size_t size)
 {
-	UNUSED_PARAMETER(size);
-
 	RTMP *rtmp = &stream->rtmp;
 	RTMPPacket packet = {0};
 
@@ -708,15 +706,6 @@ static void *send_thread(void *data)
 	}
 
 	set_output_error(stream);
-
-	if (silently_reconnecting(stream)) {
-		/* manually close the socket to prevent librtmp from sending
-		 * unpublish / deletestream messages when we call RTMP_Close,
-		 * since we want to re-use this stream when we reconnect */
-		RTMPSockBuf_Close(&stream->rtmp.m_sb);
-		stream->rtmp.m_sb.sb_socket = -1;
-	}
-
 	RTMP_Close(&stream->rtmp);
 
 	/* reset bitrate on stop */
@@ -804,8 +793,7 @@ static bool send_audio_header(struct rtmp_stream *stream, size_t idx,
 		return true;
 	}
 
-	if (!obs_encoder_get_extra_data(aencoder, &header, &packet.size))
-		return false;
+	obs_encoder_get_extra_data(aencoder, &header, &packet.size);
 	packet.data = bmemdup(header, packet.size);
 	return send_packet(stream, &packet, true, idx) >= 0;
 }
@@ -820,8 +808,7 @@ static bool send_video_header(struct rtmp_stream *stream)
 	struct encoder_packet packet = {
 		.type = OBS_ENCODER_VIDEO, .timebase_den = 1, .keyframe = true};
 
-	if (!obs_encoder_get_extra_data(vencoder, &header, &size))
-		return false;
+	obs_encoder_get_extra_data(vencoder, &header, &size);
 	packet.size = obs_parse_avc_header(&packet.data, header, size);
 	return send_packet(stream, &packet, true, 0) >= 0;
 }
@@ -1053,10 +1040,6 @@ static int try_connect(struct rtmp_stream *stream)
 	// on reconnect we need to reset the internal variables of librtmp
 	// otherwise the data sent/received will not parse correctly on the other end
 	RTMP_Reset(&stream->rtmp);
-
-	// apparently TLS will not properly persist through connections
-	RTMP_TLS_Free(&stream->rtmp);
-	RTMP_TLS_Init(&stream->rtmp);
 
 	// since we don't call RTMP_Init above, there's no other good place
 	// to reset this as doing it in RTMP_Close breaks the ugly RTMP

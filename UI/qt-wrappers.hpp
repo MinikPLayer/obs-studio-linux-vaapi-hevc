@@ -30,7 +30,6 @@
 
 #define QT_UTF8(str) QString::fromUtf8(str, -1)
 #define QT_TO_UTF8(str) str.toUtf8().constData()
-#define MAX_LABEL_LENGTH 80
 
 class QDataStream;
 class QComboBox;
@@ -38,7 +37,6 @@ class QWidget;
 class QLayout;
 class QString;
 struct gs_window;
-class QLabel;
 
 class OBSMessageBox {
 public:
@@ -70,6 +68,8 @@ QDataStream &operator>>(QDataStream &in,
 			std::vector<std::shared_ptr<OBSSignal>> &signal_vec);
 QDataStream &operator<<(QDataStream &out, const OBSScene &scene);
 QDataStream &operator>>(QDataStream &in, OBSScene &scene);
+QDataStream &operator<<(QDataStream &out, const OBSSceneItem &si);
+QDataStream &operator>>(QDataStream &in, OBSSceneItem &si);
 
 QThread *CreateQThread(std::function<void()> func);
 
@@ -119,6 +119,3 @@ QString OpenFile(QWidget *parent, QString title, QString path,
 		 QString extensions);
 QStringList OpenFiles(QWidget *parent, QString title, QString path,
 		      QString extensions);
-
-void TruncateLabel(QLabel *label, QString &newText,
-		   int length = MAX_LABEL_LENGTH);

@@ -76,7 +76,10 @@ MediaControls::MediaControls(QWidget *parent)
 	addAction(sliderBack);
 }
 
-MediaControls::~MediaControls() {}
+MediaControls::~MediaControls()
+{
+	delete ui;
+}
 
 bool MediaControls::MediaPaused()
 {

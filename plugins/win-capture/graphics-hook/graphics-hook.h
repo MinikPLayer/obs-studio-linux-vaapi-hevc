@@ -1,5 +1,7 @@
 #pragma once
 
+#include "graphics-hook-config.h"
+
 #ifdef _MSC_VER
 /* conversion from data/function pointer */
 #pragma warning(disable : 4152)
@@ -51,7 +53,7 @@ extern bool hook_d3d9(void);
 extern bool hook_d3d12(void);
 extern bool hook_dxgi(void);
 extern bool hook_gl(void);
-#ifdef COMPILE_VULKAN_HOOK
+#if COMPILE_VULKAN_HOOK
 extern bool hook_vulkan(void);
 #endif
 
@@ -60,7 +62,7 @@ extern void d3d10_free(void);
 extern void d3d11_capture(void *swap, void *backbuffer);
 extern void d3d11_free(void);
 
-#ifdef COMPILE_D3D12_HOOK
+#if COMPILE_D3D12_HOOK
 extern void d3d12_capture(void *swap, void *backbuffer);
 extern void d3d12_free(void);
 #endif

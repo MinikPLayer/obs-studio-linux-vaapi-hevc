@@ -37,18 +37,58 @@ bool isInBundle()
 
 bool GetDataFilePath(const char *data, string &output)
 {
-	NSRunningApplication *app = [NSRunningApplication currentApplication];
-	NSURL *bundleURL = [app bundleURL];
-	NSString *path = [NSString
-		stringWithFormat:@"Contents/Resources/%@",
-				 [NSString stringWithUTF8String:data]];
-	NSURL *dataURL = [bundleURL URLByAppendingPathComponent:path];
-	output = [[dataURL path] UTF8String];
+	if (isInBundle()) {
+		NSRunningApplication *app =
+			[NSRunningApplication currentApplication];
+		NSURL *bundleURL = [app bundleURL];
+		NSString *path = [NSString
+			stringWithFormat:@"Contents/Resources/data/obs-studio/%@",
+					 [NSString stringWithUTF8String:data]];
+		NSURL *dataURL = [bundleURL URLByAppendingPathComponent:path];
+		output = [[dataURL path] UTF8String];
+	} else {
+		stringstream str;
+		str << OBS_DATA_PATH "/obs-studio/" << data;
+		output = str.str();
+	}
 
 	return !access(output.c_str(), R_OK);
 }
 
-void CheckIfAlreadyRunning(bool &already_running)
+bool InitApplicationBundle()
+{
+#ifdef OBS_OSX_BUNDLE
+	static bool initialized = false;
+	if (initialized)
+		return true;
+
+	try {
+		NSBundle *bundle = [NSBundle mainBundle];
+		if (!bundle)
+			throw "Could not find main bundle";
+
+		NSString *exe_path = [bundle executablePath];
+		if (!exe_path)
+			throw "Could not find executable path";
+
+		NSString *path = [exe_path stringByDeletingLastPathComponent];
+
+		if (chdir([path fileSystemRepresentation]))
+			throw "Could not change working directory to "
+			      "bundle path";
+
+	} catch (const char *error) {
+		blog(LOG_ERROR, "InitBundle: %s", error);
+		return false;
+	}
+
+	return initialized = true;
+#else
+	return true;
+#endif
+}
+
+void CheckAppWithSameBundleID(bool &already_running)
 {
 	try {
 		NSBundle *bundle = [NSBundle mainBundle];
@@ -67,7 +107,7 @@ void CheckIfAlreadyRunning(bool &already_running)
 		already_running = app_count > 1;
 
 	} catch (const char *error) {
-		blog(LOG_ERROR, "CheckIfAlreadyRunning: %s", error);
+		blog(LOG_ERROR, "CheckAppWithSameBundleID: %s", error);
 	}
 }
 
@@ -202,9 +242,18 @@ void EnableOSXDockIcon(bool enable)
 				NSApplicationActivationPolicyProhibited];
 }
 
-// Not implemented yet
-void TaskbarOverlayInit() {}
-void TaskbarOverlaySetStatus(TaskbarOverlayStatus) {}
+bool ProcessIsRosettaTranslated()
+{
+#ifdef __aarch64__
+	return false;
+#else
+	int ret = 0;
+	size_t size = sizeof(ret);
+	if (sysctlbyname("sysctl.proc_translated", &ret, &size, NULL, 0) == -1)
+		return false;
+	return ret == 1;
+#endif
+}
 
 /*
  * This custom NSApplication subclass makes the app compatible with CEF. Qt

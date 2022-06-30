@@ -60,10 +60,6 @@ class VolumeMeter : public QWidget {
 			   setMajorTickColor DESIGNABLE true)
 	Q_PROPERTY(QColor minorTickColor READ getMinorTickColor WRITE
 			   setMinorTickColor DESIGNABLE true)
-	Q_PROPERTY(int meterThickness READ getMeterThickness WRITE
-			   setMeterThickness DESIGNABLE true)
-	Q_PROPERTY(qreal meterFontScaling READ getMeterFontScaling WRITE
-			   setMeterFontScaling DESIGNABLE true)
 
 	// Levels are denoted in dBFS.
 	Q_PROPERTY(qreal minimumLevel READ getMinimumLevel WRITE setMinimumLevel
@@ -103,7 +99,7 @@ private:
 	QSharedPointer<VolumeMeterTimer> updateTimerRef;
 
 	inline void resetLevels();
-	inline void doLayout();
+	inline void handleChannelCofigurationChange();
 	inline bool detectIdle(uint64_t ts);
 	inline void calculateBallistics(uint64_t ts,
 					qreal timeSinceLastRedraw = 0.0);
@@ -114,19 +110,20 @@ private:
 			     int height, float peakHold);
 	void paintHMeter(QPainter &painter, int x, int y, int width, int height,
 			 float magnitude, float peak, float peakHold);
-	void paintHTicks(QPainter &painter, int x, int y, int width);
+	void paintHTicks(QPainter &painter, int x, int y, int width,
+			 int height);
 	void paintVMeter(QPainter &painter, int x, int y, int width, int height,
 			 float magnitude, float peak, float peakHold);
 	void paintVTicks(QPainter &painter, int x, int y, int height);
 
 	QMutex dataMutex;
 
-	bool recalculateLayout = true;
 	uint64_t currentLastUpdateTime = 0;
 	float currentMagnitude[MAX_AUDIO_CHANNELS];
 	float currentPeak[MAX_AUDIO_CHANNELS];
 	float currentInputPeak[MAX_AUDIO_CHANNELS];
 
+	QPixmap *tickPaintCache = nullptr;
 	int displayNrAudioChannels = 0;
 	float displayMagnitude[MAX_AUDIO_CHANNELS];
 	float displayPeak[MAX_AUDIO_CHANNELS];
@@ -154,10 +151,6 @@ private:
 	QColor magnitudeColor;
 	QColor majorTickColor;
 	QColor minorTickColor;
-
-	int meterThickness;
-	qreal meterFontScaling;
-
 	qreal minimumLevel;
 	qreal warningLevel;
 	qreal errorLevel;
@@ -183,8 +176,6 @@ public:
 	void setLevels(const float magnitude[MAX_AUDIO_CHANNELS],
 		       const float peak[MAX_AUDIO_CHANNELS],
 		       const float inputPeak[MAX_AUDIO_CHANNELS]);
-	QRect getBarRect() const;
-	bool needLayoutChange();
 
 	QColor getBackgroundNominalColor() const;
 	void setBackgroundNominalColor(QColor c);
@@ -220,10 +211,6 @@ public:
 	void setMajorTickColor(QColor c);
 	QColor getMinorTickColor() const;
 	void setMinorTickColor(QColor c);
-	int getMeterThickness() const;
-	void setMeterThickness(int v);
-	qreal getMeterFontScaling() const;
-	void setMeterFontScaling(qreal v);
 	qreal getMinimumLevel() const;
 	void setMinimumLevel(qreal v);
 	qreal getWarningLevel() const;
@@ -248,7 +235,6 @@ public:
 
 protected:
 	void paintEvent(QPaintEvent *event) override;
-	void changeEvent(QEvent *e) override;
 };
 
 class VolumeMeterTimer : public QTimer {

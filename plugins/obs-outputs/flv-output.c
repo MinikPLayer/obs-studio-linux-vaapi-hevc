@@ -119,8 +119,7 @@ static void write_audio_header(struct flv_output *stream)
 	struct encoder_packet packet = {.type = OBS_ENCODER_AUDIO,
 					.timebase_den = 1};
 
-	if (!obs_encoder_get_extra_data(aencoder, &packet.data, &packet.size))
-		return;
+	obs_encoder_get_extra_data(aencoder, &packet.data, &packet.size);
 	write_packet(stream, &packet, true);
 }
 
@@ -134,8 +133,7 @@ static void write_video_header(struct flv_output *stream)
 	struct encoder_packet packet = {
 		.type = OBS_ENCODER_VIDEO, .timebase_den = 1, .keyframe = true};
 
-	if (!obs_encoder_get_extra_data(vencoder, &header, &size))
-		return;
+	obs_encoder_get_extra_data(vencoder, &header, &size);
 	packet.size = obs_parse_avc_header(&packet.data, header, size);
 	write_packet(stream, &packet, true);
 	bfree(packet.data);

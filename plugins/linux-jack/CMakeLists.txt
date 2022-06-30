@@ -1,21 +1,36 @@
 project(linux-jack)
 
-option(ENABLE_JACK "Build OBS with JACK support" OFF)
-if(NOT ENABLE_JACK)
-  obs_status(DISABLED "linux-jack")
-  return()
+if(DISABLE_JACK)
+	message(STATUS "JACK support disabled")
+	return()
 endif()
 
-find_package(Jack REQUIRED)
+find_package(Jack)
+if(NOT JACK_FOUND AND ENABLE_JACK)
+	message(FATAL_ERROR "JACK Audio Connection Kit not found but set as enabled")
+elseif(NOT JACK_FOUND)
+	message(STATUS "JACK Audio Connection Kit not found, disabling JACK plugin")
+	return()
+endif()
 
-add_library(linux-jack MODULE)
-add_library(OBS::jack ALIAS linux-jack)
+include_directories(
+	SYSTEM "${CMAKE_SOURCE_DIR}/libobs"
+	${JACK_INCLUDE_DIR}
+)
 
-target_sources(linux-jack PRIVATE linux-jack.c jack-wrapper.c jack-input.c)
+set(linux-jack_SOURCES
+	linux-jack.c
+	jack-wrapper.c
+	jack-input.c
+)
 
-target_link_libraries(linux-jack PRIVATE OBS::libobs Jack::Jack)
+add_library(linux-jack MODULE
+	${linux-jack_SOURCES}
+)
+target_link_libraries(linux-jack
+	libobs
+	${JACK_LIBRARIES}
+)
+set_target_properties(linux-jack PROPERTIES FOLDER "plugins")
 
-set_target_properties(linux-jack PROPERTIES FOLDER "plugins" PROJECT_LABEL
-                                                             "JACK Audio")
-
-setup_plugin_target(linux-jack)
+install_obs_plugin_with_data(linux-jack data)

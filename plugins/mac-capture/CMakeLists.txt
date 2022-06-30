@@ -6,23 +6,34 @@ find_library(COREFOUNDATION CoreFoundation)
 find_library(IOSURF IOSurface)
 find_library(COCOA Cocoa)
 
-add_library(mac-capture MODULE)
-add_library(OBS::capture ALIAS mac-capture)
+include_directories(${COREAUDIO}
+                    ${AUDIOUNIT}
+                    ${COREFOUNDATION}
+		    ${IOSURF}
+		    ${COCOA})
 
-target_sources(
-  mac-capture
-  PRIVATE plugin-main.c
-          audio-device-enum.c
-          audio-device-enum.h
-          mac-audio.c
-          mac-display-capture.m
-          mac-window-capture.m
-          window-utils.m
-          window-utils.h)
+set(mac-capture_HEADERS
+	audio-device-enum.h
+	window-utils.h)
 
-target_link_libraries(mac-capture PRIVATE OBS::libobs ${COREAUDIO} ${AUDIOUNIT}
-                                          ${COREFOUNDATION} ${IOSURF} ${COCOA})
+set(mac-capture_SOURCES
+	plugin-main.c
+	audio-device-enum.c
+	mac-audio.c
+	mac-display-capture.m
+	mac-window-capture.m
+	window-utils.m)
 
-set_target_properties(mac-capture PROPERTIES FOLDER "plugins" PREFIX "")
+add_library(mac-capture MODULE
+	${mac-capture_SOURCES}
+	${mac-capture_HEADERS})
+target_link_libraries(mac-capture
+	libobs
+	${COREAUDIO}
+	${AUDIOUNIT}
+	${COREFOUNDATION}
+	${IOSURF}
+	${COCOA})
+set_target_properties(mac-capture PROPERTIES FOLDER "plugins")
 
-setup_plugin_target(mac-capture)
+install_obs_plugin_with_data(mac-capture data)

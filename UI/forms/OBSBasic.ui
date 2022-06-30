@@ -657,11 +657,6 @@
     <property name="title">
      <string>Basic.MainMenu.View</string>
     </property>
-    <action name="resetUI">
-     <property name="text">
-      <string>Basic.MainMenu.View.ResetUI</string>
-     </property>
-    </action>
     <action name="actionFullscreenInterface">
      <property name="text">
       <string>Basic.MainMenu.View.Fullscreen.Interface</string>
@@ -670,7 +665,6 @@
       <string>F11</string>
      </property>
     </action>
-    <addaction name="resetUI"/>
     <addaction name="actionFullscreenInterface"/>
     <addaction name="separator"/>
     <addaction name="toggleListboxToolbars"/>
@@ -691,8 +685,8 @@
     <property name="title">
      <string>Basic.MainMenu.Docks</string>
     </property>
-    <addaction name="lockDocks"/>
-    <addaction name="resetDocks"/>
+    <addaction name="lockUI"/>
+    <addaction name="resetUI"/>
     <addaction name="separator"/>
     <addaction name="toggleScenes"/>
     <addaction name="toggleSources"/>
@@ -1022,7 +1016,7 @@
          <enum>QFrame::Sunken</enum>
         </property>
         <property name="verticalScrollBarPolicy">
-         <enum>Qt::ScrollBarAsNeeded</enum>
+         <enum>Qt::ScrollBarAlwaysOn</enum>
         </property>
         <property name="horizontalScrollBarPolicy">
          <enum>Qt::ScrollBarAlwaysOff</enum>
@@ -1078,7 +1072,7 @@
          <enum>Qt::ScrollBarAlwaysOff</enum>
         </property>
         <property name="horizontalScrollBarPolicy">
-         <enum>Qt::ScrollBarAsNeeded</enum>
+         <enum>Qt::ScrollBarAlwaysOn</enum>
         </property>
         <property name="widgetResizable">
          <bool>true</bool>
@@ -1165,17 +1159,59 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="QComboBox" name="transitions">
-          <property name="minimumSize">
-           <size>
-            <width>120</width>
-            <height>0</height>
-           </size>
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <property name="spacing">
+           <number>4</number>
           </property>
-          <property name="accessibleName">
-           <string>Transition</string>
-          </property>
-         </widget>
+          <item>
+           <widget class="QComboBox" name="transitions">
+            <property name="minimumSize">
+             <size>
+              <width>120</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="accessibleName">
+             <string>Transition</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="transitionProps">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>22</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="toolTip">
+             <string>Basic.TransitionProperties</string>
+            </property>
+            <property name="accessibleName">
+             <string>Basic.TransitionProperties</string>
+            </property>
+            <property name="text">
+             <string notr="true"/>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>:/settings/images/settings/general.svg</normaloff>:/settings/images/settings/general.svg</iconset>
+            </property>
+            <property name="flat">
+             <bool>true</bool>
+            </property>
+            <property name="themeID" stdset="0">
+             <string notr="true">configIconSmall</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_3">
@@ -1217,134 +1253,6 @@
             </property>
             <property name="value">
              <number>300</number>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_4">
-          <property name="spacing">
-           <number>4</number>
-          </property>
-          <item>
-           <spacer name="horizontalSpacer">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeType">
-             <enum>QSizePolicy::Expanding</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QPushButton" name="transitionAdd">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>22</width>
-              <height>22</height>
-             </size>
-            </property>
-            <property name="toolTip">
-             <string>Basic.AddTransition</string>
-            </property>
-            <property name="accessibleName">
-             <string>Basic.AddTransition</string>
-            </property>
-            <property name="text">
-             <string notr="true"/>
-            </property>
-            <property name="icon">
-             <iconset>
-              <normaloff>:/res/images/add.png</normaloff>:/res/images/add.png</iconset>
-            </property>
-            <property name="flat">
-             <bool>true</bool>
-            </property>
-            <property name="themeID" stdset="0">
-             <string notr="true">addIconSmall</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="transitionRemove">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>22</width>
-              <height>22</height>
-             </size>
-            </property>
-            <property name="toolTip">
-             <string>Basic.RemoveTransition</string>
-            </property>
-            <property name="accessibleName">
-             <string>Basic.RemoveTransition</string>
-            </property>
-            <property name="text">
-             <string notr="true"/>
-            </property>
-            <property name="icon">
-             <iconset>
-              <normaloff>:/res/images/list_remove.png</normaloff>:/res/images/list_remove.png</iconset>
-            </property>
-            <property name="flat">
-             <bool>true</bool>
-            </property>
-            <property name="themeID" stdset="0">
-             <string notr="true">removeIconSmall</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="transitionProps">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>22</width>
-              <height>22</height>
-             </size>
-            </property>
-            <property name="toolTip">
-             <string>Basic.TransitionProperties</string>
-            </property>
-            <property name="accessibleName">
-             <string>Basic.TransitionProperties</string>
-            </property>
-            <property name="text">
-             <string notr="true"/>
-            </property>
-            <property name="icon">
-             <iconset>
-              <normaloff>:/settings/images/settings/general.svg</normaloff>:/settings/images/settings/general.svg</iconset>
-            </property>
-            <property name="flat">
-             <bool>true</bool>
-            </property>
-            <property name="themeID" stdset="0">
-             <string notr="true">configIconSmall</string>
             </property>
            </widget>
           </item>
@@ -1767,9 +1675,6 @@
    <property name="text">
     <string>Basic.MainMenu.Edit.Transform.CopyTransform</string>
    </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+C</string>
-   </property>
   </action>
   <action name="actionPasteTransform">
    <property name="enabled">
@@ -1777,9 +1682,6 @@
    </property>
    <property name="text">
     <string>Basic.MainMenu.Edit.Transform.PasteTransform</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+V</string>
    </property>
   </action>
   <action name="actionRotate90CW">
@@ -2058,12 +1960,12 @@
     <string>Basic.Stats</string>
    </property>
   </action>
-  <action name="resetDocks">
+  <action name="resetUI">
    <property name="text">
-    <string>Basic.MainMenu.Docks.ResetDocks</string>
+    <string>Basic.MainMenu.Docks.ResetUI</string>
    </property>
   </action>
-  <action name="lockDocks">
+  <action name="lockUI">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -2071,7 +1973,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Basic.MainMenu.Docks.LockDocks</string>
+    <string>Basic.MainMenu.Docks.LockUI</string>
    </property>
   </action>
   <action name="toggleScenes">

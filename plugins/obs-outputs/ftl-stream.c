@@ -553,8 +553,7 @@ static bool send_video_header(struct ftl_stream *stream, int64_t dts_usec)
 					.keyframe = true,
 					.dts_usec = dts_usec};
 
-	if (!obs_encoder_get_extra_data(vencoder, &header, &size))
-		return false;
+	obs_encoder_get_extra_data(vencoder, &header, &size);
 	packet.size = obs_parse_avc_header(&packet.data, header, size);
 	return send_packet(stream, &packet, true) >= 0;
 }

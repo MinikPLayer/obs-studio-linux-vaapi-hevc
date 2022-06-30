@@ -22,7 +22,7 @@
 #include "obs-nix-x11.h"
 
 #include <xcb/xcb.h>
-#if defined(XINPUT_FOUND)
+#if USE_XINPUT
 #include <xcb/xinput.h>
 #endif
 #include <X11/Xlib.h>
@@ -94,7 +94,7 @@ struct obs_hotkeys_platform {
 	int num_keysyms;
 	int syms_per_code;
 
-#if defined(XINPUT_FOUND)
+#if USE_XINPUT
 	bool pressed[XINPUT_MOUSE_LEN];
 	bool update[XINPUT_MOUSE_LEN];
 	bool button_pressed[XINPUT_MOUSE_LEN];
@@ -694,15 +694,6 @@ static obs_key_t key_from_base_keysym(obs_hotkeys_platform_t *context,
 		}
 	}
 
-	switch (code) {
-	case XK_Shift_R:
-		return OBS_KEY_SHIFT;
-	case XK_Control_R:
-		return OBS_KEY_CONTROL;
-	case XK_Alt_R:
-		return OBS_KEY_ALT;
-	}
-
 	return OBS_KEY_NONE;
 }
 
@@ -814,7 +805,7 @@ static inline xcb_window_t root_window(obs_hotkeys_platform_t *context,
 	return 0;
 }
 
-#if defined(XINPUT_FOUND)
+#if USE_XINPUT
 static inline void registerMouseEvents(struct obs_core_hotkeys *hotkeys)
 {
 	obs_hotkeys_platform_t *context = hotkeys->platform_context;
@@ -845,7 +836,7 @@ static bool obs_nix_x11_hotkeys_platform_init(struct obs_core_hotkeys *hotkeys)
 	hotkeys->platform_context = bzalloc(sizeof(obs_hotkeys_platform_t));
 	hotkeys->platform_context->display = display;
 
-#if defined(XINPUT_FOUND)
+#if USE_XINPUT
 	registerMouseEvents(hotkeys);
 #endif
 	fill_base_keysyms(hotkeys);
@@ -873,7 +864,7 @@ static bool mouse_button_pressed(xcb_connection_t *connection,
 {
 	bool ret = false;
 
-#if defined(XINPUT_FOUND)
+#if USE_XINPUT
 	memset(context->pressed, 0, XINPUT_MOUSE_LEN);
 	memset(context->update, 0, XINPUT_MOUSE_LEN);
 

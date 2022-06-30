@@ -96,8 +96,8 @@
         {
           "type": "git",
           "url": "https://git.videolan.org/git/ffmpeg/nv-codec-headers.git",
-          "tag": "n11.1.5.1",
-          "commit": "84483da70d903239d4536763fde8c7e6c4e80784"
+          "tag": "n11.1.5.0",
+          "commit": "b641a195edbe3ac9788e681e22c2e2fad8aacddb"
         }
       ]
     },
@@ -281,7 +281,7 @@
         {
           "type": "git",
           "url": "https://luajit.org/git/luajit-2.0.git",
-          "commit": "a91d0d9d3bba1a936669cfac3244509a0f2ac0e3",
+          "commit": "ec6edc5c39c25e4eb3fca51b753f9995e97215da",
           "disable-shallow-clone": true
         },
         {
@@ -347,14 +347,7 @@
         "-Dbluez5-codec-aptx=disabled",
         "-Dlibcamera=disabled",
         "-Dudevrulesdir=/app/lib/udev/rules.d/",
-        "-Dsession-managers=[]",
-        "-Dtests=disabled",
-        "-Dexamples=disabled",
-        "-Dpw-cat=disabled"
-      ],
-      "cleanup": [
-        "/include",
-        "/bin"
+        "-Dsession-managers=[]"
       ],
       "sources": [
         {
@@ -371,9 +364,7 @@
       "builddir": true,
       "config-opts": [
         "-DCMAKE_BUILD_TYPE=Release",
-        "-DAJA_BUILD_OPENSOURCE=ON",
-        "-DAJA_BUILD_APPS=OFF",
-        "-DAJA_INSTALL_HEADERS=ON"
+        "-DAJA_BUILD_OPENSOURCE=ON"
       ],
       "cleanup": [
         "/include"
@@ -382,8 +373,14 @@
         {
           "type": "git",
           "url": "https://github.com/aja-video/ntv2.git",
-          "tag": "v16.2-bugfix5",
-          "commit": "0acbac70a0b5e6509cca78cfbf69974c73c10db9"
+          "commit": "abf17cc1e7aadd9f3e4972774a3aba2812c51b75"
+        },
+        {
+          "type": "shell",
+          "commands": [
+            "sed -i 's/Clang|GNU/GNU/g' cmake/CommonFlags.cmake",
+            "sed -i 's/Linux|Darwin/Linux/g' cmake/CommonFlags.cmake"
+          ]
         }
       ]
     },
@@ -419,15 +416,13 @@
       "config-opts": [
         "-DCMAKE_BUILD_TYPE=Release",
         "-DENABLE_WAYLAND=ON",
-        "-DENABLE_BROWSER=ON",
+        "-DBUILD_BROWSER=ON",
         "-DCEF_ROOT_DIR=/app/cef",
+        "-DUNIX_STRUCTURE=ON",
         "-DUSE_XDG=ON",
-        "-DENABLE_ALSA=OFF",
+        "-DDISABLE_ALSA=ON",
         "-DENABLE_PULSEAUDIO=ON",
-        "-DENABLE_JACK=ON",
-        "-DENABLE_RTMPS=ON",
-        "-DENABLE_VLC=OFF",
-        "-DENABLE_AJA=ON"
+        "-DWITH_RTMPS=ON"
       ],
       "secret-opts": [
         "-DRESTREAM_CLIENTID=$RESTREAM_CLIENTID",
@@ -440,7 +435,6 @@
         "-DYOUTUBE_SECRET_HASH=$YOUTUBE_SECRET_HASH"
       ],
       "post-install": [
-        "cmake --install . --component obs_libraries",
         "install -d /app/plugins",
         "install -d /app/extensions/Plugins"
       ],
