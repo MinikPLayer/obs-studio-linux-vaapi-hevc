@@ -13,6 +13,11 @@ OBS Studio <https://obsproject.com>
    :alt: OBS Studio Discord Server
    :target: https://obsproject.com/discord
 
+Mod info
+-------------------
+* Modded to support vaapi HEVC
+* You can download modified source code from the releases tab
+
 What is OBS Studio?
 -------------------
 
